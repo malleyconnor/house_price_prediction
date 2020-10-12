@@ -33,10 +33,40 @@ def preprocess_data(path, drop_features=['date'], label='price'):
 
     return X, Y
 
+typeEnum = {
+    'binary'        : 0,
+    'categorical'   : 1,
+    'ordinal'       : 2,
+    'continuous'    : 3
+}
+
+featureTypes = {
+    'bedrooms'      : 'ordinal',
+    'bathrooms'     : 'ordinal',
+    'sqft_living'   : 'continuous',
+    'floors'        : 'ordinal',
+    'waterfront'    : 'binary',
+    'view'          : 'ordinal',
+    'condition'     : 'ordinal',
+    'grade'         : 'ordinal',
+    'sqft_above'    : 'continuous',
+    'sqft_basement' : 'continuous',
+    'yr_built'      : 'ordinal',
+    'yr_renovated'  : 'ordinal',
+    'zipcode'       : 'categorical',
+    'lat'           : 'continuous',
+    'long'          : 'continuous',
+    'sqft_living15' : 'continuous',
+    'sqft_lot15'    : 'continuous'
+}
 
 
 if __name__ == '__main__':
     X, Y = preprocess_data('./data/kc_house_data.csv')
+
+    # Exporting normalized data to CSV
+    X.to_csv('./data/X.csv')
+    Y.to_csv('./data/Y.csv')
 
     print(X.head)
     print(Y.head)
