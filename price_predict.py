@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import sklearn
+import statistics
 from sklearn import preprocessing
 import sys, getopt
 import os
@@ -77,8 +78,44 @@ def plot_feature_histograms(X, save_dir):
         plt.title('%s Probablity Density (%s)' % (column, featureTypes[column]))
         plt.ylabel('Probability Density')
         plt.xlabel('Feature value')
+
+        feature_stats = get_feature_stats(X)
+        if (feature_stats):
+            statStrings = []
+            for stat in feature_stats[column].keys():
+                statStrings.append('%s = %f\n' % (stat, feature_stats[column][stat]))
+
+            statString = ''.join(statStrings)
+
+            # Displaying 
+            props = dict(boxstyle='round', facecolor='wheat', alpha=0.5) #From Stackoverflow
+            plt.text(0.95, 0.95, statString, transform=plt.gca().transAxes, fontsize=10, 
+            verticalalignment='top', horizontalalignment='right', bbox=props)
+
         plt.savefig('%s/%s_hist.png' % (save_dir, column), dpi=300)
         plt.clf()
+
+
+
+# Gets stats for each feature like mean, stddev, etc...
+def get_feature_stats(X):
+    stats = {}
+    for column in X.columns:
+        stats[column] = {}
+        stats[column]['mean'] = np.mean(X[column])
+        stats[column]['median'] = np.median(X[column])
+        stats[column]['std']  = np.std(X[column])
+        stats[column]['var']  = np.var(X[column])
+
+        # Gets mode (or None in case of continuous / equally probable values)
+        try:
+            stats[column]['mode'] = statistics.mode(X[column])
+        except statistics.StatisticsError:
+            mode = -1
+        # TODO: Add frequency of mode
+        # TODO: Add impurity / entropy measures
+
+    return stats
 
 
 
@@ -88,13 +125,14 @@ if __name__ == '__main__':
     plotDir = './figures'
 
     # Command-line Option handler
-    opts, args = getopt.getopt(sys.argv[1:], 'hp:', ['help', 'plot='])
+    opts, args = getopt.getopt(sys.argv[1:], 'hp', ['help', 'plot='])
     for opt, arg in opts:
         if opt in ('-h', '--help'):
             print('Figure it out dummy.')
             sys.exit(2)
         elif opt in ('-p', 'plot'):
-            plotDir = arg
+            if (arg):
+                plotDir = arg
             savePlots = True
 
 
