@@ -50,6 +50,7 @@ def normalize_data(X, Y):
     return X, Y
 
 
+
 def preprocess_data(path, drop_features=['date'], label='price',
     save_dir=None):
     # Splitting data into features/labels
@@ -93,6 +94,16 @@ def plot_feature_histograms(X, save_dir):
             verticalalignment='top', horizontalalignment='right', bbox=props)
 
         plt.savefig('%s/%s_hist.png' % (save_dir, column), dpi=300)
+        plt.clf()
+
+# Plots feature correlation with the label
+def plot_feature_correlation(X, Y, save_dir):
+    for column in X.columns:
+        plt.scatter(x=X[column], y=Y[Y.columns[0]])
+        plt.title('%s Feature Correlation (%s)' % (column, featureTypes[column]))
+        plt.ylabel('Price')
+        plt.xlabel('%s' % column)
+        plt.savefig('%s/%s_correlation.png' % (save_dir, column), dpi=300)
         plt.clf()
 
 
@@ -147,3 +158,4 @@ if __name__ == '__main__':
             os.mkdir(plotDir)
 
         plot_feature_histograms(X, save_dir=plotDir)
+        plot_feature_correlation(X, Y, save_dir=plotDir+"/correlation")
