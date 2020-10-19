@@ -96,6 +96,16 @@ def plot_feature_histograms(X, save_dir):
         plt.savefig('%s/%s_hist.png' % (save_dir, column), dpi=300)
         plt.clf()
 
+
+# Gets pearson correlation coefficient between two variables
+def get_correlation(X, Y):
+    std_X = np.std(X)
+    std_Y = np.std(Y)
+    covariance = np.cov(X, Y)
+
+    return covariance[0][1] / (std_X*std_Y)
+
+
 # Plots feature correlation with the label
 def plot_feature_correlation(X, Y, save_dir):
     for column in X.columns:
@@ -103,9 +113,16 @@ def plot_feature_correlation(X, Y, save_dir):
         plt.title('%s Feature Correlation (%s)' % (column, featureTypes[column]))
         plt.ylabel('Price')
         plt.xlabel('%s' % column)
+
+        xy_correlation = get_correlation(X[column], Y[Y.columns[0]])
+
+        # Displaying 
+        props = dict(boxstyle='round', facecolor='wheat', alpha=0.5) #From Stackoverflow
+        plt.text(0.95, 0.95, 'Pearson Correlation: %f' % (xy_correlation), transform=plt.gca().transAxes, fontsize=10, 
+        verticalalignment='top', horizontalalignment='right', bbox=props)
+
         plt.savefig('%s/%s_correlation.png' % (save_dir, column), dpi=300)
         plt.clf()
-
 
 
 # Gets stats for each feature like mean, stddev, etc...
