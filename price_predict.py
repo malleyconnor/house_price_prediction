@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import sklearn
 import statistics
 from sklearn import preprocessing
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
 import sys, getopt
 import os
 
@@ -105,6 +107,15 @@ def get_correlation(X, Y):
 
     return covariance[0][1] / (std_X*std_Y)
 
+# Gets list of correlations, sorted in reverse order by magnitude of correlation for each feature within a dataframe
+def get_correlations(X, Y):
+    correlations = []
+    for i, column in enumerate(X.columns):
+        correlations.append((column, get_correlation(X[column], Y[Y.columns[0]])))
+
+    correlations = sorted(correlations, key=lambda tup: abs(tup[1]), reverse=True)
+    return correlations
+
 
 # Plots feature correlation with the label
 def plot_feature_correlation(X, Y, save_dir):
@@ -176,3 +187,25 @@ if __name__ == '__main__':
 
         plot_feature_histograms(X, save_dir=plotDir)
         plot_feature_correlation(X, Y, save_dir=plotDir+"/correlation")
+
+
+    # Ranks the correlations of each variable
+    correlations = get_correlations(X, Y)
+    print('Correlations of Features reverse sorted by magnitude:')
+    for i in range(len(correlations)):
+        print(correlations[i])
+
+
+
+    # Ranking features using random forest (w/ MSE)
+    rf = RandomForestRegressor(n_estimators=1000, max_depth=10, n_jobs=-1)
+    rf.fit(X, Y[Y.columns[0]])
+    feature_importances = zip(X.columns, rf.feature_importances_)
+    feature_importances = sorted(feature_importances, key=lambda tup: abs(tup[1]), reverse=True)
+    print('\nTop 10 Features reverse sorted by importance from random forest')
+    for feature in feature_importances:
+        print(feature)
+
+
+    # TODO: Bin lat/long data into a 2-D grid and enumerate
+    # TODO: Try mRMR for ranking features (see if it agrees with random forest)
