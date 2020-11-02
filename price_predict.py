@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import sklearn
 import statistics
 from sklearn import preprocessing
+from sklearn.cluster import KMeans
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.metrics import mean_absolute_error, median_absolute_error
@@ -155,7 +156,7 @@ def plot_feature_correlation(X, Y, save_dir):
         plt.savefig('%s/%s_correlation.png' % (save_dir, column), dpi=300)
         plt.clf()
 
-def plot_latlong_clusters(X, Y, cluster, save_dir, colors=["#ED6A5A", "#F4F1BB", "#9BC1BC", "#5CA5A9", "#E6EBE0", "#93B7BE", "#F1FFFA", "#D5C7BC", "#785964", "#454545"], background_dir="./map.png", save_name="latlong_clustering", marker_size=0.05):
+def plot_latlong_clusters(X, Y, cluster, save_dir, colors=["#F46036", "#2E294E", "#1B998B", "#E71D36", "#C5D86D", "#70D6FF", "#FF70A6", "#FF9770", "#FFD670", "#E9FF70"], background_dir="./map.png", save_name="latlong_clustering", marker_size=0.05):
     count = min(len(X), min(len(Y), len(cluster)))
     if (count == 0 or len(colors) == 0):
         print("lat-long cluster plot called with invalid arugments")
@@ -264,8 +265,17 @@ if __name__ == '__main__':
     preprocess_data('./data/kc_house_data.csv', drop_features=['date', 'id'], 
     save_dir='./data', test_size=test_size, normalize_labels=False)
 
+    # Clustering based on lat long data
+    plot_latlong_clusters(X_long, X_lat, [0] * len(X_long), save_dir=plotDir, save_name="latlong_mapping")
 
-    plot_latlong_clusters(X_long, X_lat, [0] * len(X_long), save_dir=plotDir)
+    latlong = np.zeros((len(X_lat), 2))
+    for i in range(len(X_lat)):
+        latlong[i][0] = X_lat[i]
+        latlong[i][1] = X_long[i]
+
+    for nclusters in range(2, 11):
+        kmeans = KMeans(n_clusters=nclusters).fit(latlong)
+        plot_latlong_clusters(X_long, X_lat, kmeans.labels_, save_dir=plotDir, save_name=("latlong_kmeans_%s_clusters" % nclusters))
 
     # Plots histograms
     if (savePlots):
