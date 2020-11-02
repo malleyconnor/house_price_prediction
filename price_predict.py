@@ -72,6 +72,7 @@ def preprocess_data(path, drop_features=['date'], label='price',
     shuffle=True, random_state=47)
     min_norm = np.min(Y_train)
     max_norm = np.max(Y_train)
+
     X_train, X_test, Y_train, Y_test = normalize_data(X_train, X_test, Y_train, Y_test, 
     normalize_labels)
     
@@ -83,7 +84,7 @@ def preprocess_data(path, drop_features=['date'], label='price',
         X_test.to_csv('%s/X_test.csv' % (save_dir))
         Y_test.to_csv('%s/Y_test.csv' % (save_dir))
 
-    return X_train, X_test, Y_train, Y_test, min_norm, max_norm
+    return X_train, X_test, Y_train, Y_test, min_norm, max_norm, X['long'], X['lat']
 
 
 
@@ -153,6 +154,32 @@ def plot_feature_correlation(X, Y, save_dir):
 
         plt.savefig('%s/%s_correlation.png' % (save_dir, column), dpi=300)
         plt.clf()
+
+def plot_latlong_clusters(X, Y, cluster, save_dir, colors=["#ED6A5A", "#F4F1BB", "#9BC1BC", "#5CA5A9", "#E6EBE0", "#93B7BE", "#F1FFFA", "#D5C7BC", "#785964", "#454545"], background_dir="./map.png", save_name="latlong_clustering", marker_size=0.05):
+    count = min(len(X), min(len(Y), len(cluster)))
+    if (count == 0 or len(colors) == 0):
+        print("lat-long cluster plot called with invalid arugments")
+        return
+
+    # Transform lat and long with map offset
+    mc = [47.0451, -122.5736, 47.8116, -120.9609]
+    Y = Y.apply(lambda x: (x - mc[0]) / (mc[2] - mc[0]))
+    X = X.apply(lambda x: (x - mc[1]) / (mc[3] - mc[1]))
+
+    # Assign colors based on cluster number
+    point_colors = [colors[0]] * count
+    num_colors = len(colors)
+    for i in range(count):
+        point_colors[i] = colors[cluster[i] % num_colors]
+
+    # Create and save plot
+    bg = plt.imread(background_dir)
+    fig, ax = plt.subplots()
+    ax.imshow(bg, extent=[0, 1, 0, 1])
+    ax.scatter(x=X, y=Y, color=point_colors, s=[marker_size]*count)
+    ax.axis('off')
+    plt.savefig('%s/%s.png' % (save_dir, save_name), dpi=300)
+    plt.clf()
 
 
 # Gets stats for each feature like mean, stddev, etc...
@@ -233,9 +260,12 @@ if __name__ == '__main__':
 
     # Initial Preprocessing of data
     test_size = 0.2
-    X_train, X_test, Y_train, Y_test, min_norm, max_norm =\
+    X_train, X_test, Y_train, Y_test, min_norm, max_norm, X_long, X_lat =\
     preprocess_data('./data/kc_house_data.csv', drop_features=['date', 'id'], 
     save_dir='./data', test_size=test_size, normalize_labels=False)
+
+
+    plot_latlong_clusters(X_long, X_lat, [0] * len(X_long), save_dir=plotDir)
 
     # Plots histograms
     if (savePlots):
