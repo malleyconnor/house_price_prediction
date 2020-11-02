@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import sklearn
 import statistics
 from sklearn import preprocessing
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans, DBSCAN
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.metrics import mean_absolute_error, median_absolute_error
@@ -156,7 +156,7 @@ def plot_feature_correlation(X, Y, save_dir):
         plt.savefig('%s/%s_correlation.png' % (save_dir, column), dpi=300)
         plt.clf()
 
-def plot_latlong_clusters(X, Y, cluster, save_dir, colors=["#F46036", "#2E294E", "#1B998B", "#E71D36", "#C5D86D", "#70D6FF", "#FF70A6", "#FF9770", "#FFD670", "#E9FF70"], background_dir="./map.png", save_name="latlong_clustering", marker_size=0.05):
+def plot_latlong_clusters(X, Y, cluster, save_dir, colors=["#F46036", "#2E294E", "#1B998B", "#E71D36", "#C5D86D", "#70D6FF", "#FF70A6", "#FF9770", "#FFD670", "#424242"], background_dir="./map.png", save_name="latlong_clustering", marker_size=0.05):
     count = min(len(X), min(len(Y), len(cluster)))
     if (count == 0 or len(colors) == 0):
         print("lat-long cluster plot called with invalid arugments")
@@ -181,6 +181,8 @@ def plot_latlong_clusters(X, Y, cluster, save_dir, colors=["#F46036", "#2E294E",
     ax.axis('off')
     plt.savefig('%s/%s.png' % (save_dir, save_name), dpi=300)
     plt.clf()
+    fig.clf()
+    plt.close('all')
 
 
 # Gets stats for each feature like mean, stddev, etc...
@@ -273,9 +275,16 @@ if __name__ == '__main__':
         latlong[i][0] = X_lat[i]
         latlong[i][1] = X_long[i]
 
+    # KMeans clustering
     for nclusters in range(2, 11):
         kmeans = KMeans(n_clusters=nclusters).fit(latlong)
-        plot_latlong_clusters(X_long, X_lat, kmeans.labels_, save_dir=plotDir, save_name=("latlong_kmeans_%s_clusters" % nclusters))
+        plot_latlong_clusters(X_long, X_lat, kmeans.labels_, save_dir=plotDir+"/kmeans", save_name=("latlong_kmeans_%s_clusters" % nclusters))
+
+    # DBSCAN clustering
+    for eps in [0.001, 0.002, 0.005, 0.01, 0.05]:
+        for core_neighors in [3, 5, 8, 10, 15, 30, 50]:
+            dbscan = DBSCAN(eps = eps, min_samples = core_neighors).fit(latlong)
+            plot_latlong_clusters(X_long, X_lat, dbscan.labels_, save_dir=plotDir+"/DBSCAN", save_name=("latlong_DBSCAN_%s_%s" % (eps, core_neighors)))
 
     # Plots histograms
     if (savePlots):
