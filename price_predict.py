@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import sklearn
+import scipy
 import statistics
 from sklearn import preprocessing
 from sklearn.cluster import KMeans, DBSCAN
@@ -9,6 +10,8 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.metrics import mean_absolute_error, median_absolute_error
 from sklearn.model_selection import train_test_split
+from sklearn.feature_selection import f_regression
+from scipy.stats.stats import pearsonr
 import sys, getopt
 import os
 
@@ -144,6 +147,30 @@ def get_correlations(X, Y, disp=False):
 
     return correlations
 
+def compute_correlation(X, Y):
+    correlations = []
+    for i, column in enumerate(X.columns):
+        correlations.append(abs(get_correlation(X[column], Y[Y.columns[0]])))
+
+    return correlations
+
+def compute_self_correlation(X):
+    correlations = []
+    for i, i_column in enumerate(X.columns):
+        for j, j_column in enumerate(X.columns):
+            correlations.append(abs(pearsonr(X[i_column], X[j_column])[0]))
+
+    return correlations
+
+def compute_f_statistic(X, Y):
+    f_scores = []
+
+    var_y = np.var(Y[Y.columns[0]])
+    for i, column in enumerate(X.columns):
+        var_x = np.var(X[column])
+        f_scores.append(abs(var_x / var_y))
+    
+    return f_scores
 
 # Plots feature correlation with the label
 def plot_feature_correlation(X, Y, save_dir):
@@ -273,6 +300,100 @@ def rf_rank(X, Y, n_estimators=100, max_depth=None, disp=False, threshold=None):
     
     return feature_importances
 
+# Perform mRMR to greedily select the top k features which minimize redundancy and maximize relevance
+# When additive is true, we perform FCD mRMR, when false we perform FCQ mRMR
+# Returns: List of selected feature names
+def mRMR(x, y, k=10, additive=True, verbose=1):
+    if k < 1:
+        return []
+
+    # Compute F-Test (used for relevance)
+    f_scores = f_regression(x, y[y.columns[0]])[0]
+    f_scores /= np.max(f_scores)
+
+    # Select first feature based on maximum relevance
+    best = None
+    best_col = None
+    for i, column in enumerate(x.columns):
+        if (best == None or f_scores[i] > best):
+            best = f_scores[i]
+            best_col = column
+
+    selected_features = [best_col]
+    remaining_features = x.columns.tolist()
+    remaining_features.remove(best_col)
+    overall = 0
+    rel, red = compute_relevance_redundancy(x[selected_features], y)
+    if (additive):
+        overall = rel - red
+    else:
+        overall = rel / red
+
+    # Add up to k addition features, so long as overall objective function is improving
+    for i in range(k-1):
+        best = None
+        best_col = None
+
+        if (len(remaining_features) < 1):
+            break
+
+        if (verbose == 2):
+            print (" ---  Start iter ", i+1, " --- ")
+
+        # Try adding each feature and select one that maximizes the objective function
+        for j, col in enumerate(remaining_features):
+            features = selected_features.copy()
+            features.append(col)
+            rel, red = compute_relevance_redundancy(x[features], y)
+
+            value = 0
+            if (additive):
+                value = rel - red
+            else:
+                value = rel / red
+
+            if (best == None or value > best):
+                best = value
+                best_col = col
+
+            if (verbose == 2):
+                print ("   Feature ", col, ":")
+                print ("     rel = ", rel)
+                print ("     red = ", red)
+                print ("     value = ", value, "\n")
+
+        # Add the feature to selected features and continue
+        selected_features.append(best_col)
+        remaining_features.remove(best_col)
+        overall = best
+
+        if (verbose):
+            print("Iter ", i+1, " added feature ", best_col, " for an overall value of ", overall)
+
+    if (verbose):
+        print ("mRMR selected features:\n", selected_features)
+
+    return selected_features
+
+def compute_relevance_redundancy(x, y):
+    f_scores = f_regression(x, y[y.columns[0]])[0]
+    f_scores /= np.max(f_scores)
+    cor = compute_self_correlation(x)
+
+    s = len(f_scores)
+    rel = 0
+    for x in f_scores:
+        rel += x
+    rel *= (1 / s)
+
+    s = len(cor)
+    red = 0
+    for x in cor:
+        red += x
+    red *= (1 / s)
+
+    return rel, red
+
 if __name__ == '__main__':
     savePlots, plotDir = handle_cl_args()
 
@@ -303,128 +424,164 @@ if __name__ == '__main__':
                     dbscan = DBSCAN(eps = eps, min_samples = core_neighors).fit(latlong)
                     plot_latlong_clusters(X_long, X_lat, dbscan.labels_, save_dir=plotDir+"/DBSCAN", save_name=("latlong_DBSCAN_%s_%s_%s" % (eps, core_neighors, distance)))
 
-    # KNN with clustering based on zipcodes
-    ############################################################################################################
-    # Zip code based clusters
-    zip_models = {}
-    train_zips = []
-    test_zips  = []
-    zip_features = list(X_train.columns)
-    zip_features.remove('zipcode')
-    for zipcode in X_train['zipcode']:
-        if (zipcode not in zip_models.keys()):
-            train_zips.append(zipcode)
-            zip_models[zipcode] = {}
-            zip_models[zipcode]['x_train'] = X_train[zip_features][X_train['zipcode'] == zipcode]
-            zip_models[zipcode]['y_train'] = Y_train[X_train['zipcode'] == zipcode].to_numpy()
-            zip_models[zipcode]['n_train'] = len(zip_models[zipcode]['x_train'])
-            zip_models[zipcode]['feature_ranking'] = rf_rank(zip_models[zipcode]['x_train'], 
-                zip_models[zipcode]['y_train'], n_estimators=10, 
-                max_depth=int(0.8*len(zip_features)), threshold=0.01)
+    # Feature selection with mRMR for full dataset, using varying number of features
+    # Seems to vary noticably between runs, probably want to do some kind of averaging
+    do_mRMR_KNN_test = True
+    if (do_mRMR_KNN_test):
+        feature_order = mRMR(X_train, Y_train, k=len(X_train.columns), additive=True, verbose=0)
+        best = 0
+        best_features = []
+        print(" --- Using FCD mRMR --- ")
+        for k in range(1, len(X_train.columns)):
+            features = feature_order[:k]
+            KNN = KNeighborsRegressor(n_neighbors=5, weights='distance')
+            KNN.fit(X_train[features], Y_train)
+            score = KNN.score(X_test[features], Y_test)
+            print("KNN using", k, "mRMR selected features. Score = ", score)
 
-            # Training separate knn for each zipcode
-            zip_models[zipcode]['knn'] = KNeighborsRegressor(n_neighbors=5, weights='distance')
-            zip_models[zipcode]['knn'].fit(zip_models[zipcode]['x_train'], zip_models[zipcode]['y_train'])
-    for zipcode in X_test['zipcode']:
-        # Need to check this unless we ensure zipcodes in test set are subset of training set
-        if zipcode not in zip_models.keys():
-            zip_models[zipcode] = {}
-            test_zips.append(zipcode)
-            zip_models[zipcode]['x_test'] = X_test[zip_features][X_test['zipcode'] == zipcode]
-            zip_models[zipcode]['y_test'] = Y_test[X_test['zipcode'] == zipcode].to_numpy()
-            zip_models[zipcode]['n_test'] = len(zip_models[zipcode]['x_test'])
-        elif 'x_test' not in zip_models[zipcode].keys():
-            test_zips.append(zipcode)
-            zip_models[zipcode]['x_test'] = X_test[zip_features][X_test['zipcode'] == zipcode]
-            zip_models[zipcode]['y_test'] = Y_test[X_test['zipcode'] == zipcode].to_numpy()
-            zip_models[zipcode]['n_test'] = len(zip_models[zipcode]['x_test'])
+            if score > best:
+                best = score
+                best_features = features
+        
+        print ("\b Best number of features for additive mRMR and KNN is ", len(best_features), " with score of", best, " and using features:\n", best_features)
 
-            # Predictions and score for each individual zipcode
-            # (Will also analyze accuracy of whole dataset)
-            zip_models[zipcode]['predictions'] = np.array(zip_models[zipcode]['knn'].predict(zip_models[zipcode]['x_test']))
-            zip_models[zipcode]['r2_score'] = zip_models[zipcode]['knn'].score(zip_models[zipcode]['x_test'], zip_models[zipcode]['y_test'])
-            errors = np.subtract(zip_models[zipcode]['predictions'], zip_models[zipcode]['y_test'])
-            zip_models[zipcode]['MSE'] = np.sum(np.multiply(errors, errors)) / len(errors)
-            zip_models[zipcode]['MAE'] = np.sum(np.abs(errors)) / len(errors) 
+        feature_order = mRMR(X_train, Y_train, k=len(X_train.columns), additive=False, verbose=0)
+        best = 0
+        best_features = []
+        print("\n --- Using FCDQ mRMR --- ")
+        for k in range(1, len(X_train.columns)):
+            features = feature_order[:k]
+            KNN = KNeighborsRegressor(n_neighbors=5, weights='distance')
+            KNN.fit(X_train[features], Y_train)
+            score = KNN.score(X_test[features], Y_test)
+            print("KNN using", k, "mRMR selected features. Score = ", score)
 
-    # Gets average errors across test dataset
-    total_mse = 0
-    total_mae = 0
-    total_r2  = 0
-    weight_per_sample = 1 / len(Y_test)
-    for zipcode in zip_models.keys():
-        total_mse += zip_models[zipcode]['MSE'] * weight_per_sample * zip_models[zipcode]['n_test']
-        total_mae += zip_models[zipcode]['MAE'] * weight_per_sample * zip_models[zipcode]['n_test']
-        total_r2 += zip_models[zipcode]['r2_score'] * weight_per_sample * zip_models[zipcode]['n_test']
-    
+            if score > best:
+                best = score
+                best_features = features
+        
+        print ("\b Best number of features for multiplicative mRMR and KNN is ", len(best_features), " with score of", best, " and using features:\n", best_features)
 
-    print('Average MAE of KNN with zipcode based clusters: %f' % (total_mae))
-    print('Average MSE of KNN with zipcode based clusters: %f' % (total_mse))
-    print('Average R^2 score of KNN with zipcode based clusters: %f' % (total_r2))
+    do_zip_models = False
+    if (do_zip_models):
+        # KNN with clustering based on zipcodes
+        ############################################################################################################
+        # Zip code based clusters
+        zip_models = {}
+        train_zips = []
+        test_zips  = []
+        zip_features = list(X_train.columns)
+        zip_features.remove('zipcode')
+        for zipcode in X_train['zipcode']:
+            if (zipcode not in zip_models.keys()):
+                train_zips.append(zipcode)
+                zip_models[zipcode] = {}
+                zip_models[zipcode]['x_train'] = X_train[zip_features][X_train['zipcode'] == zipcode]
+                zip_models[zipcode]['y_train'] = Y_train[X_train['zipcode'] == zipcode].to_numpy()
+                zip_models[zipcode]['n_train'] = len(zip_models[zipcode]['x_train'])
+                zip_models[zipcode]['feature_ranking'] = rf_rank(zip_models[zipcode]['x_train'], 
+                    zip_models[zipcode]['y_train'], n_estimators=10, 
+                    max_depth=int(0.8*len(zip_features)), threshold=0.01)
 
-    # If a model hasn't been trained for a specific zipcode, we'll have to
-    # use a different method for those samples
-    train_zips = set(train_zips)
-    test_zips  = set(test_zips)
-    if not test_zips.issubset(train_zips):
-        print('WARNING: Evaluation zipcodes is NOT a subset of train zipcodes')
+                # Training separate knn for each zipcode
+                zip_models[zipcode]['knn'] = KNeighborsRegressor(n_neighbors=5, weights='distance')
+                zip_models[zipcode]['knn'].fit(zip_models[zipcode]['x_train'], zip_models[zipcode]['y_train'])
+        for zipcode in X_test['zipcode']:
+            # Need to check this unless we ensure zipcodes in test set are subset of training set
+            if zipcode not in zip_models.keys():
+                zip_models[zipcode] = {}
+                test_zips.append(zipcode)
+                zip_models[zipcode]['x_test'] = X_test[zip_features][X_test['zipcode'] == zipcode]
+                zip_models[zipcode]['y_test'] = Y_test[X_test['zipcode'] == zipcode].to_numpy()
+                zip_models[zipcode]['n_test'] = len(zip_models[zipcode]['x_test'])
+            elif 'x_test' not in zip_models[zipcode].keys():
+                test_zips.append(zipcode)
+                zip_models[zipcode]['x_test'] = X_test[zip_features][X_test['zipcode'] == zipcode]
+                zip_models[zipcode]['y_test'] = Y_test[X_test['zipcode'] == zipcode].to_numpy()
+                zip_models[zipcode]['n_test'] = len(zip_models[zipcode]['x_test'])
 
-    # Gets min number of sets in zipcode
-    min_size = sys.maxsize
-    max_size = 0
-    for zipcode in zip_models.keys():
-        if zip_models[zipcode]['n_train'] < min_size:
-            min_size = zip_models[zipcode]['n_train']
-        if zip_models[zipcode]['n_train'] > max_size:
-            max_size = zip_models[zipcode]['n_train']
-    print('Min training set for zipcode clusters: %d' % (min_size))
-    print('Max training set for zipcode clusters: %d' % (max_size))
+                # Predictions and score for each individual zipcode
+                # (Will also analyze accuracy of whole dataset)
+                zip_models[zipcode]['predictions'] = np.array(zip_models[zipcode]['knn'].predict(zip_models[zipcode]['x_test']))
+                zip_models[zipcode]['r2_score'] = zip_models[zipcode]['knn'].score(zip_models[zipcode]['x_test'], zip_models[zipcode]['y_test'])
+                errors = np.subtract(zip_models[zipcode]['predictions'], zip_models[zipcode]['y_test'])
+                zip_models[zipcode]['MSE'] = np.sum(np.multiply(errors, errors)) / len(errors)
+                zip_models[zipcode]['MAE'] = np.sum(np.abs(errors)) / len(errors) 
 
-    ############################################################################################################
+        # Gets average errors across test dataset
+        total_mse = 0
+        total_mae = 0
+        total_r2  = 0
+        weight_per_sample = 1 / len(Y_test)
+        for zipcode in zip_models.keys():
+            total_mse += zip_models[zipcode]['MSE'] * weight_per_sample * zip_models[zipcode]['n_test']
+            total_mae += zip_models[zipcode]['MAE'] * weight_per_sample * zip_models[zipcode]['n_test']
+            total_r2 += zip_models[zipcode]['r2_score'] * weight_per_sample * zip_models[zipcode]['n_test']
+        
+
+        print('Average MAE of KNN with zipcode based clusters: %f' % (total_mae))
+        print('Average MSE of KNN with zipcode based clusters: %f' % (total_mse))
+        print('Average R^2 score of KNN with zipcode based clusters: %f' % (total_r2))
+
+        # If a model hasn't been trained for a specific zipcode, we'll have to
+        # use a different method for those samples
+        train_zips = set(train_zips)
+        test_zips  = set(test_zips)
+        if not test_zips.issubset(train_zips):
+            print('WARNING: Evaluation zipcodes is NOT a subset of train zipcodes')
+
+        # Gets min number of sets in zipcode
+        min_size = sys.maxsize
+        max_size = 0
+        for zipcode in zip_models.keys():
+            if zip_models[zipcode]['n_train'] < min_size:
+                min_size = zip_models[zipcode]['n_train']
+            if zip_models[zipcode]['n_train'] > max_size:
+                max_size = zip_models[zipcode]['n_train']
+        print('Min training set for zipcode clusters: %d' % (min_size))
+        print('Max training set for zipcode clusters: %d' % (max_size))
+
+        ############################################################################################################
 
 
+        # Plots histograms
+        if (savePlots):
+            if not(os.path.isdir(plotDir)):
+                os.mkdir(plotDir)
+
+            plot_feature_histograms(X, save_dir=plotDir)
+            plot_feature_correlation(X, Y, save_dir=plotDir+"/correlation")
+            plot_lat_long_hist(X)
 
 
+        # TODO: Keep either zipcode or lat/long, possibly redundant 
+        # (if keeping lat/long, then maybe bin it. Higher priced homes are likely to be on north west)
+
+        # Ranks the correlations of each variable
+        correlations = get_correlations(X_train, Y_train, disp=False)
+
+        # Ranking features using random forest (w/ MSE)
+        # TODO: Check as a function of n_estimators and max_depth, and see how it changes feature ranks or results
+        feature_importances = rf_rank(X_train, Y_train, n_estimators=100, disp=False)
+
+        # TODO: Try mRMR for removing redundant features (see if it agrees with random forest)
 
 
-    # Plots histograms
-    if (savePlots):
-        if not(os.path.isdir(plotDir)):
-            os.mkdir(plotDir)
+        # Training random forest regressors using restricted number of top features
+        # TODO: Try exhaustive/randomized grid search with n_features, n_estimators, max_depth
+        num_features = 10
+        n_estimators = 100
+        feature_list = [feature[0] for feature in feature_importances[0:num_features]]
+        if 'zipcode' in feature_list:
+            feature_list.remove('zipcode')
+            num_features -= 1
 
-        plot_feature_histograms(X, save_dir=plotDir)
-        plot_feature_correlation(X, Y, save_dir=plotDir+"/correlation")
-        plot_lat_long_hist(X)
+        # %20 Dropout for each tree
+        max_depth = (num_features * 8) // 10
+        rf = RandomForestRegressor(n_estimators=n_estimators, n_jobs=-1, max_depth=max_depth)
+        rf.fit(X_train[feature_list], Y_train['price'])
+        Y_pred = rf.predict(X_test[feature_list])
+        rf_error = mean_absolute_error(Y_test, Y_pred)
+        print('MAE of Random Forest: %f' % (rf_error))
 
-
-    # TODO: Keep either zipcode or lat/long, possibly redundant 
-    # (if keeping lat/long, then maybe bin it. Higher priced homes are likely to be on north west)
-
-    # Ranks the correlations of each variable
-    correlations = get_correlations(X_train, Y_train, disp=False)
-
-    # Ranking features using random forest (w/ MSE)
-    # TODO: Check as a function of n_estimators and max_depth, and see how it changes feature ranks or results
-    feature_importances = rf_rank(X_train, Y_train, n_estimators=100, disp=False)
-
-    # TODO: Try mRMR for removing redundant features (see if it agrees with random forest)
-
-
-    # Training random forest regressors using restricted number of top features
-    # TODO: Try exhaustive/randomized grid search with n_features, n_estimators, max_depth
-    num_features = 10
-    n_estimators = 100
-    feature_list = [feature[0] for feature in feature_importances[0:num_features]]
-    if 'zipcode' in feature_list:
-        feature_list.remove('zipcode')
-        num_features -= 1
-
-    # %20 Dropout for each tree
-    max_depth = (num_features * 8) // 10
-    rf = RandomForestRegressor(n_estimators=n_estimators, n_jobs=-1, max_depth=max_depth)
-    rf.fit(X_train[feature_list], Y_train['price'])
-    Y_pred = rf.predict(X_test[feature_list])
-    rf_error = mean_absolute_error(Y_test, Y_pred)
-    print('MAE of Random Forest: %f' % (rf_error))
-
-    # TODO: Use weights of feature importances for KNN
+        # TODO: Use weights of feature importances for KNN
