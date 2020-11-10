@@ -213,7 +213,7 @@ class DataPreprocessor(object):
             return []
 
         # Compute F-Test (used for relevance)
-        f_scores = f_regression(self.X_train, self.Y_train)[0]
+        f_scores = f_regression(self.X_train, self.Y_train[self.Y_train.columns[0]])[0]
         f_scores /= np.max(f_scores)
 
         # Select first feature based on maximum relevance
