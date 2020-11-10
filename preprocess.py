@@ -135,7 +135,7 @@ class DataPreprocessor(object):
 
         return stats
 
-        # Ranks the input features using a random forest algorithm (MSE)
+    # Ranks the input features using a random forest algorithm (MSE)
     def rf_rank(self, n_estimators=25, max_depth=None, disp=False, threshold=None):
         rf = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth)
         rf.fit(self.X_train, self.Y_train['price'])
