@@ -1,6 +1,7 @@
 import pandas as pd
 import sklearn
 from plotting import *
+from preprocess import *
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
@@ -29,8 +30,8 @@ class cluster_model(object):
 
     # Clustering based on lat long data
     def __latlong_cluster(self, eps_vals=None, core_neighbors_vals=None):
-        X_long = np.array(self.X['long'])
-        X_lat  = np.array(self.X['lat'])
+        X_long = np.array(self.X_train['long'])
+        X_lat  = np.array(self.X_train['lat'])
 
         if (self.plot_clusters):
             plot_latlong_clusters(self.X['long'], self.X['lat'], [0] * len(X_long), save_dir=self.plotDir, save_name="latlong_mapping")
@@ -62,8 +63,8 @@ class cluster_model(object):
             for core_neighors in core_neighbors_vals:
                     self.dbscan = DBSCAN(eps=eps, min_samples=core_neighors).fit(self.cluster_features)
                     if (self.plot_clusters):
-                        plot_latlong_clusters(self.X['long'], self.X['lat'], self.dbscan.labels_, save_dir=self.plotDir+"/DBSCAN", 
-                        save_name=("latlong_DBSCAN_%s_%s" % (eps, core_neighors)))
+                        plot_latlong_clusters(self.X_train['long'], self.X_train['lat'], self.dbscan.labels_, 
+                        save_dir=self.plotDir+"/DBSCAN", save_name=("latlong_DBSCAN_%s_%s" % (eps, core_neighors)))
 
         return self.dbscan
 
@@ -75,7 +76,7 @@ class cluster_model(object):
             for nclusters in krange:
                 self.kmeans = KMeans(n_clusters=nclusters).fit(self.cluster_features)
                 if (self.plot_clusters):
-                    plot_latlong_clusters(self.X_long, self.X_lat, self.kmeans.labels_, save_dir=self.plotDir+"/kmeans", 
+                    plot_latlong_clusters(self.X_train['long'], self.X_train['lat'], self.kmeans.labels_, save_dir=self.plotDir+"/kmeans", 
                     save_name=("latlong_kmeans_%s_clusters" % nclusters))
 
         return self.kmeans
@@ -94,15 +95,16 @@ class cluster_model(object):
                 if  label not in models[method].keys():
                     models[method][label] = {}
                     models[method][label]['X_train'] = self.X_train[self.X_train.columns][self.dbscan.labels_ == label]
-                    models[method][label]['Y_train'] = self.Y_train[self.dbscan.labels_ == label]
+                    models[method][label]['Y_train'] = self.Y_train[self.dbscan.labels_ == label]['price']
                     models[method][label]['n_train'] = len(self.X_train)
-                    models[method][label]['rf_ranking'] = rf_rank(models[method][label]['X_train'])
+                    models[method][label]['rf_ranking'] = rf_rank(models[method][label]['X_train'], models[method][label]['Y_train'])
 
                     for regressor in self.regressors:
                         # Training separate knn for each cluster
                         if regressor == 'knn':
                             models[method][label]['knn'] = KNeighborsRegressor(n_neighbors=5, weights='distance')
                             models[method][label]['knn'].fit(models[method][label]['X_train'], models[method][label]['Y_train'])
+                        # TODO: Initialize other regressors for each cluster here
 
 
     # Predictions and score for each individual zipcode
@@ -147,3 +149,24 @@ class cluster_model(object):
     #print('Max training set for zipcode clusters: %d' % (max_size))
 
     #############################################################################################################
+
+# Ranks the input features using a random forest algorithm (MSE)
+def rf_rank(X, Y, n_estimators=25, max_depth=None, disp=False, threshold=None):
+    rf = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth)
+    rf.fit(X, Y)
+    feature_importances = zip(X.columns, rf.feature_importances_)
+    feature_importances = sorted(feature_importances, key=lambda tup: abs(tup[1]), reverse=True)
+
+    if threshold:
+        cutoff = len(feature_importances)
+        for i, importance in enumerate(feature_importances):
+            if importance[1] < threshold:
+                cutoff = i
+        feature_importances = feature_importances[:cutoff]
+
+    if (disp):
+        print('\nTop 10 Features reverse sorted by importance from random forest')
+        for feature in feature_importances:
+            print(feature)
+
+    return feature_importances
