@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import sklearn
 from sklearn.linear_model import LinearRegression
 from sklearn.neighbors import KNeighborsRegressor
+from sklearn.preprocessing import PolynomialFeatures
 import scipy
 import statistics
 import sys, getopt
@@ -109,4 +110,28 @@ if __name__ == '__main__':
 
     print ("Best Linear Regression: Score =", best_lr, ", k =", best_lr_k)
     print ("Best KNN: Score =", best_knn, ", k =", best_knn_k)
+
+    # Test polynomial regression
+    for p in range(2, 5):
+        best = -1
+        best_k = -1
+        print ("  Degree =", p)
+        for k in range(3, len(ordered_features)):
+            features = ordered_features[:k]
+
+            poly = PolynomialFeatures(degree=p)
+            x_poly_train = poly.fit_transform(X_train[features])
+            x_poly_test = poly.fit_transform(X_test[features])
+
+            reg = LinearRegression()
+            reg.fit(x_poly_train, Y_train[Y_train.columns[0]])
+            score = reg.score(x_poly_test, Y_test[Y_test.columns[0]])
+
+            print ("    K =", k, ": Score =", score)
+
+            if (score > best):
+                best = score
+                best_k = k
+
+        print ("For degree =", p, ": Best score =", best, ", best k =", best_k)
 
