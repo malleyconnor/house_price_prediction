@@ -2,14 +2,16 @@ import pandas as pd
 import sklearn
 from plotting import *
 from preprocess import *
+from sklearn.metrics import r2_score
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.neighbors import KNeighborsRegressor
+from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
+from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, median_absolute_error
 
 class cluster_model(object):
     def __init__(self, X, Y, X_train, X_test, Y_train, Y_test, cluster_type='latlong', 
-    cluster_methods=['dbscan'], regressors=['knn'], plot_clusters=False, plotDir='./figures'):
+    cluster_methods=['dbscan', 'kmeans'], regressors=['knn'], plot_clusters=False, plotDir='./figures'):
         self.X = X
         self.Y = Y
         self.X_train = X_train
@@ -26,7 +28,8 @@ class cluster_model(object):
             self.__latlong_cluster()
             
 
-        self.__build_model()
+        self.models = self.__build_model()
+
 
     # Clustering based on lat long data
     def __latlong_cluster(self, eps_vals=None, core_neighbors_vals=None):
@@ -56,9 +59,9 @@ class cluster_model(object):
     def __find_best_dbscan(self, eps_vals=None, core_neighbors_vals=None):
         # DBSCAN clustering
         if not eps_vals:
-            eps_vals = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1]
+            eps_vals = [0.02]
         if not core_neighbors_vals:
-            core_neighbors_vals = [3, 5, 8, 10, 15, 30, 50]
+            core_neighbors_vals = [100]
         for eps in eps_vals:
             for core_neighors in core_neighbors_vals:
                     self.dbscan = DBSCAN(eps=eps, min_samples=core_neighors).fit(self.cluster_features)
@@ -81,30 +84,100 @@ class cluster_model(object):
 
         return self.kmeans
 
+
+    def __build_dbscan_model(self, model):
+        model['model'] = self.dbscan
+        for label in self.dbscan.labels_:
+            if  label not in model.keys():
+                model[label] = {}
+                model[label]['X_train'] = self.X_train[self.X_train.columns][self.dbscan.labels_ == label]
+                model[label]['Y_train'] = self.Y_train[self.dbscan.labels_ == label]['price']
+                model[label]['n_train'] = len(model[label]['X_train'])
+
+                # MRMR
+                model[label]['rf_ranking'] = rf_rank(model[label]['X_train'], model[label]['Y_train'])
+
+                for regressor in self.regressors:
+                    # Training separate knn for each cluster
+                    if regressor == 'knn':
+                        model[label]['knn'] = {}
+                        model[label]['knn']['model'] = KNeighborsRegressor(n_neighbors=5, weights='distance')
+                        model[label]['knn']['model'].fit(model[label]['X_train'], model[label]['Y_train'])
+                    elif regressor == 'lr':
+                        model[label]['lr'] = {}
+                        model[label]['lr']['model'] = LinearRegression(normalize=True)
+                        model[label]['lr']['model'].fit(model[label]['X_train'],
+                            model[label]['Y_train'])
+
+
+        model['predictor'] = KNeighborsClassifier(n_neighbors=1)
+        model['predictor'].fit(self.X_train[['lat', 'long']], self.dbscan.labels_)
+
+
+    # Gets the test sets for a dbscan cluster model 
+    def __get_dbscan_test_sets(self):
+        predictions = np.array(self.models['dbscan']['predictor'].predict(self.X_test[['lat', 'long']]))
+        cluster_labels = list(set(predictions))
+
+        for label in cluster_labels:
+            self.models['dbscan'][label]['X_test'] = self.X_test[self.X_test.columns][predictions == label]
+            self.models['dbscan'][label]['Y_test'] = self.Y_test[predictions == label]['price']
+            self.models['dbscan'][label]['n_test'] = len(self.models['dbscan'][label]['X_test'])
+            print('cluster # = %d' % (label))
+            print('\tn_train = %d' % (self.models['dbscan'][label]['n_train']))
+            print('\tn_test = %d' % (self.models['dbscan'][label]['n_test']))
+                    
+
+
+
     # Building entire cluster-based model (including fitting regressors)
     def __build_model(self):
-        models = {}
+        self.models = {}
 
         for method in self.cluster_methods:
-            models[method] = {}
+            self.models[method] = {}
             if method == 'dbscan':
-                models[method]['model'] = self.dbscan
+                self.models['dbscan'] = {}
+                self.__build_dbscan_model(self.models['dbscan'])
+                self.__get_dbscan_test_sets()
             elif method == 'kmeans':
-                models[method]['model'] = self.kmeans
-            for label in self.dbscan.labels_:
-                if  label not in models[method].keys():
-                    models[method][label] = {}
-                    models[method][label]['X_train'] = self.X_train[self.X_train.columns][self.dbscan.labels_ == label]
-                    models[method][label]['Y_train'] = self.Y_train[self.dbscan.labels_ == label]['price']
-                    models[method][label]['n_train'] = len(self.X_train)
-                    models[method][label]['rf_ranking'] = rf_rank(models[method][label]['X_train'], models[method][label]['Y_train'])
+                self.models[method]['model'] = self.kmeans
+            elif method == 'None':
+                self.models[method]['model'] = None
 
-                    for regressor in self.regressors:
-                        # Training separate knn for each cluster
-                        if regressor == 'knn':
-                            models[method][label]['knn'] = KNeighborsRegressor(n_neighbors=5, weights='distance')
-                            models[method][label]['knn'].fit(models[method][label]['X_train'], models[method][label]['Y_train'])
-                        # TODO: Initialize other regressors for each cluster here
+        return self.models
+
+
+    def evaluate(self):
+        predictions = {}
+        labels      = {}
+
+        # Getting prediction scores for each regressor in each cluster
+        for method in self.cluster_methods:
+            clusters = list(self.models[method].keys())
+            clusters.remove('model')
+            clusters.remove('predictor')
+
+            for regressor in self.regressors:
+                predictions[regressor] = []
+                labels[regressor] = []
+                for cluster in clusters:
+                    predictions[regressor].extend(self.models[method][cluster][regressor]['model'].predict(
+                    self.models[method][cluster]['X_test']))
+                    labels[regressor].extend(self.models[method][cluster]['Y_test'].to_list())
+
+
+        # Getting total prediction score of the whole model
+        score = {}
+        for regressor in self.regressors:
+            score[regressor] = r2_score(labels[regressor], predictions[regressor])
+
+
+        print('r2 score for entire model (knn): %f' % (score['knn']))
+        print('r2 score for entire model (lr): %f' % (score['lr']))
+
+
+
 
 
     # Predictions and score for each individual zipcode
