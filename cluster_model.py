@@ -5,7 +5,6 @@ from plotting import *
 from preprocess import *
 from sklearn.metrics import r2_score
 from scipy.spatial import distance
-from scipy.stats import PearsonRConstantInputWarning
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
@@ -245,11 +244,10 @@ class cluster_model(object):
                     labels[regressor].extend(self.models[method][cluster]['Y_test']['price'].to_list())
 
                 # Getting total prediction score of the whole model
-                try:
-                    score = r2_score(labels[regressor], predictions[regressor])
-                except ValueError:
-                    print('breakpoint')
+                score = r2_score(labels[regressor], predictions[regressor])
                 print('R^2 score for %s clustering with %s regressor: %f' % (method, regressor, score))
+                print('RMSE for %s clustering with %s regressor: %f' % (method, regressor, score))
+
 
 
 
