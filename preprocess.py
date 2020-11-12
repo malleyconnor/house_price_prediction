@@ -10,12 +10,14 @@ from scipy.stats import pearsonr
 from plotting import *
 import os
 
+from scipy.stats import PearsonRConstantInputWarning
 
 
 # Preprocesses data and keeps any metadata we may need later
 class DataPreprocessor(object):
-    def __init__(self, input_path='./data/kc_house_data.csv', label='price', drop_features=['date'], save_dir=None, test_size=0.2,\
-    normalize_features=True, omit_norm_features=['zipcode'], normalize_labels=False, save_plots=False, plotDir='./figures'):
+    def __init__(self, input_path=None, label='price', drop_features=['date'], save_dir=None, test_size=0.2,\
+    normalize_features=True, omit_norm_features=['zipcode'], normalize_labels=False, save_plots=False, plotDir='./figures',
+    xtrain=None, xtest=None, ytrain=None, ytest=None, input_split=False):
         self.input_path = input_path
         self.label = label
         self.drop_features = drop_features
@@ -23,10 +25,21 @@ class DataPreprocessor(object):
         self.test_size = 0.2
         self.normalize_features = normalize_features
         self.normalize_labels = normalize_labels
+
+        os.makedirs(plotDir, exist_ok=True)
+        os.makedirs(save_dir, exist_ok=True)
+
+        self.input_split = input_split
+        self.X_train = xtrain
+        self.X_test  = xtest
+        self.Y_train = ytrain
+        self.Y_test  = ytest
         self.__preprocess_data()
+
         self.get_feature_stats()
         self.get_correlations()
         self.rf_rank()
+
 
         # Plots histograms
         if (save_plots):
@@ -63,29 +76,33 @@ class DataPreprocessor(object):
             self.Y_train = pd.DataFrame(mmScaler.transform(self.Y_train), index=self.X_train.index, columns=[self.Y_train.columns[0]])
             self.Y_test  = pd.DataFrame(mmScaler.transform(self.Y_test), index=self.X_test.index, columns=[self.Y_test.columns[0]])
 
+
         return self.X_train, self.X_test, self.Y_train, self.Y_test
 
 
     # Preprocesses data by normalizing, dropping specified features, and splitting into train/test sets
     # TODO: Incorporate splitting from decision tree (GINI/Entropy) to bin data as well (if needed)
     def __preprocess_data(self):
-        # Splitting data into features/labels
-        X = pd.read_csv(self.input_path)
-        Y = pd.DataFrame(X[self.label])
+        if (not self.input_split):
+            # Splitting data into features/labels
+            X = pd.read_csv(self.input_path)
+            Y = pd.DataFrame(X[self.label])
 
-        # Dropping label and irrelevant features from X
-        X.drop(self.label, inplace=True, axis=1)
-        X.drop(self.drop_features, inplace=True, axis=1)
+            # Dropping label and irrelevant features from X
+            X.drop(self.label, inplace=True, axis=1)
+            X.drop(self.drop_features, inplace=True, axis=1)
 
-        self.X = X.copy()
-        self.Y = Y.copy()
+            self.X = X.copy()
+            self.Y = Y.copy()
 
-        self.X_train, self.X_test, self.Y_train, self.Y_test =\
-        train_test_split(X, Y, test_size=self.test_size, shuffle=True, random_state=None)
-        self.min_norm = np.min(self.Y_train)
-        self.max_norm = np.max(self.Y_train)
+            self.X_train, self.X_test, self.Y_train, self.Y_test =\
+            train_test_split(X, Y, test_size=self.test_size, shuffle=True, random_state=None)
+            self.min_norm = np.min(self.Y_train)
+            self.max_norm = np.max(self.Y_train)
 
-        self.normalize_data(self.normalize_labels)
+        # Doing normalization
+        if self.normalize_features:
+            self.normalize_data(self.normalize_labels)
         
         # Exporting normalized data to CSV
         if (self.save_dir != None):    
@@ -95,14 +112,22 @@ class DataPreprocessor(object):
             self.X_test.to_csv('%s/X_test.csv' % (self.save_dir))
             self.Y_test.to_csv('%s/Y_test.csv' % (self.save_dir))
 
+
         return self.X_train, self.X_test, self.Y_train, self.Y_test
 
 
     # Gets list of correlations, sorted in reverse order by magnitude of correlation for each feature within a dataframe
+    # TODO: Handle case for constant value arrays (i.e. cluster of houses in mainland all have waterfront == 0)
     def get_correlations(self, disp=False):
         correlations = []
         for i, column in enumerate(self.X_train.columns):
-            correlations.append((column, pearsonr(self.X_train[column], self.Y_train[self.label])[0]))
+            corr = 0
+            try:
+                corr = pearsonr(self.X_train[column], self.Y_train[self.label])[0]
+            except PearsonRConstantInputWarning():
+                corr = 0
+
+            correlations.append((column, corr))
 
         correlations = sorted(correlations, key=lambda tup: abs(tup[1]), reverse=True)
 
@@ -118,16 +143,16 @@ class DataPreprocessor(object):
     # Gets stats for each feature like mean, stddev, etc...
     def get_feature_stats(self):
         stats = {}
-        for column in self.X.columns:
+        for column in self.X_train.columns:
             stats[column] = {}
-            stats[column]['mean'] = np.mean(self.X[column])
-            stats[column]['median'] = np.median(self.X[column])
-            stats[column]['std']  = np.std(self.X[column])
-            stats[column]['var']  = np.var(self.X[column])
+            stats[column]['mean'] = np.mean(self.X_train[column])
+            stats[column]['median'] = np.median(self.X_train[column])
+            stats[column]['std']  = np.std(self.X_train[column])
+            stats[column]['var']  = np.var(self.X_train[column])
 
             # Gets mode (or None in case of continuous / equally probable values)
             try:
-                stats[column]['mode'] = statistics.mode(self.X[column])
+                stats[column]['mode'] = statistics.mode(self.X_train[column])
             except statistics.StatisticsError:
                 mode = -1
 

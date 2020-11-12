@@ -10,6 +10,7 @@ import statistics
 import sys, getopt
 import os
 
+
 from preprocess import *
 from plotting import *
 from cluster_model import * 
@@ -37,6 +38,7 @@ if __name__ == '__main__':
     savePlots, plotDir = handle_cl_args()
 
     test_size = 0.2
+    print('Preprocessing data before clustering... (Just add option for no clustering)')
     preprocessed_data = DataPreprocessor('./data/kc_house_data.csv', drop_features=['date', 'id'], 
     save_dir='./data', test_size=test_size, normalize_labels=False, save_plots=True, plotDir=plotDir)
 
