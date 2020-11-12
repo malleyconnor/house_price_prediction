@@ -1,8 +1,10 @@
 import pandas as pd
 import sklearn
+import sys
 from plotting import *
 from preprocess import *
 from sklearn.metrics import r2_score
+from scipy.spatial import distance
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
@@ -56,12 +58,36 @@ class cluster_model(object):
 
     # TODO: Change to actually return the best model
     # TODO: Create plot which includes train/test split
-    def __find_best_dbscan(self, eps_vals=None, core_neighbors_vals=None):
+    def __find_best_dbscan(self, eps_vals=None, core_neighbors_vals=None, createPlots=False):
+        max_k = 100
+        k_nearest_distances = np.zeros((max_k, len(self.X_train)))
+
+        # Getting distances between k-nearest neighbors in specified range
+        cdist_matrix = distance.cdist(self.X_train[['lat', 'long']], self.X_train[['lat', 'long']])
+        np.fill_diagonal(cdist_matrix, sys.maxsize)
+        for i in range(len(self.X_train)):
+            k_nearest_distances[:,i] = cdist_matrix[i, np.argpartition(cdist_matrix[i,:], max_k)[:max_k]]
+        k_nearest_distances = np.sort(k_nearest_distances, axis=1)
+
+        # Getting best eps for each value of k
+        # (Maximize 2nd derivative to find best eps)
+        optimal_eps = np.zeros(max_k)
+        distances_2nd_diff = np.diff(k_nearest_distances, n=2, axis=1)
+        max_diffs = np.argmax(distances_2nd_diff, axis=1)
+        for i in range(max_k):
+            optimal_eps[i] = k_nearest_distances[i, max_diffs[i]]
+
+       
+        if createPlots:
+            save_dir = self.plotDir + '/DBSCAN/eps_neighbor_search/'
+            os.makedirs(save_dir, exist_ok=True)
+            plot_eps_neighbor_search(k_nearest_distances, optimal_eps, save_dir)
+
+
         # DBSCAN clustering
-        if not eps_vals:
-            eps_vals = [0.02]
-        if not core_neighbors_vals:
-            core_neighbors_vals = [100]
+        # (Fixing min_samples = 50 here)
+        core_neighbors_vals = [50]
+        eps_vals = [optimal_eps[core_neighbors_vals[0]-1]]
         for eps in eps_vals:
             for core_neighors in core_neighbors_vals:
                     self.dbscan = DBSCAN(eps=eps, min_samples=core_neighors).fit(self.cluster_features)

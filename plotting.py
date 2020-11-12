@@ -117,3 +117,15 @@ def plot_lat_long_hist(X, bins=(5,5), save_path='./figures/latlong_hist.png'):
     plt.colorbar()
     plt.savefig(save_path, dpi=300)
     plt.clf()
+
+def plot_eps_neighbor_search(k_nearest_distances, optimal_eps, save_dir):
+    X = np.linspace(1, len(k_nearest_distances[0,:]), len(k_nearest_distances[0]), endpoint=True)
+    for kval in range(1, len(k_nearest_distances[:,0])+1):
+        plt.scatter(X, k_nearest_distances[kval-1,:])
+        plt.xlabel('Sample #')
+        plt.ylabel('Lat/Long Distance to %d-th nearest neighbor' % (kval))
+        plt.title('DBSCAN Eps Optimization Plot')
+        plt.hlines(optimal_eps[kval-1], xmin=0, xmax=len(X)+1, linestyles='dashed')
+        plt.text(0, optimal_eps[kval-1]+0.02, 'Optimal Eps = %.3f' % (optimal_eps[kval-1]))
+        plt.savefig(save_dir+'k_%d.png' % (kval), dpi=300)
+        plt.clf()
