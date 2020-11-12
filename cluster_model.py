@@ -3,7 +3,7 @@ import sklearn
 import sys
 from plotting import *
 from preprocess import *
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, mean_squared_error
 from scipy.spatial import distance
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.ensemble import RandomForestRegressor
@@ -245,8 +245,9 @@ class cluster_model(object):
 
                 # Getting total prediction score of the whole model
                 score = r2_score(labels[regressor], predictions[regressor])
+                rmse  = mean_squared_error(labels[regressor], predictions[regressor], squared=False) 
                 print('R^2 score for %s clustering with %s regressor: %f' % (method, regressor, score))
-                print('RMSE for %s clustering with %s regressor: %f' % (method, regressor, score))
+                print('RMSE for %s clustering with %s regressor: %f' % (method, regressor, rmse))
 
 
 
