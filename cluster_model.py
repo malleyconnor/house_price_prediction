@@ -13,7 +13,7 @@ from sklearn.metrics import mean_absolute_error, median_absolute_error
 
 class cluster_model(object):
     def __init__(self, X, Y, X_train, X_test, Y_train, Y_test, cluster_type='latlong', 
-    cluster_methods=['dbscan', 'kmeans'], regressors=['knn'], plot_clusters=True, plotDir='./figures'):
+    cluster_methods=['dbscan', 'kmeans'], regressors=['knn'], plot_clusters=True, plotDir='./figures', doMRMR=False):
         self.X = X
         self.Y = Y
         self.X_train = X_train
@@ -26,6 +26,7 @@ class cluster_model(object):
         self.plotDir = plotDir
         self.plot_clusters = plot_clusters
         self.test_size = 0.2
+        self.doMRMR = doMRMR
 
         if cluster_type == 'latlong':
             self.__latlong_cluster()
@@ -42,15 +43,28 @@ class cluster_model(object):
                 preprocessed_data = DataPreprocessor(xtrain=self.models[method][cluster]['X_train'], xtest=self.models[method][cluster]['X_test'], 
                 ytrain=self.models[method][cluster]['Y_train'], ytest=self.models[method][cluster]['Y_test'], drop_features=['date', 'id'],
                 save_dir='./data/'+str(method)+'/'+str(cluster), test_size=self.test_size, normalize_labels=False, save_plots=False, 
-                plotDir=self.plotDir+'/'+str(method)+'/'+str(cluster), input_split=True)
+                plotDir=self.plotDir+'/'+str(method)+'/'+str(cluster), input_split=True, omit_norm_features=[])
 
-                #preprocessed_data.mRMR_KNN_test()
+                # In case a feature has the same value for every data point in a cluster 
+                columns = preprocessed_data.X_train.columns
+                for column in columns:
+                    if len(list(set(preprocessed_data.X_train[column]))) <= 1:
+                        preprocessed_data.X_train.drop(column, axis=1, inplace=True)
+                        preprocessed_data.X_test.drop(column, axis=1, inplace=True)
+            
 
-                self.models[method][cluster]['X_train'] = preprocessed_data.X_train
-                self.models[method][cluster]['X_test']  = preprocessed_data.X_test
+                k = 7
+                if (self.doMRMR):
+                    self.models[method][cluster]['preprocessed_data'] = preprocessed_data
+                    selected_features = self.models[method][cluster]['preprocessed_data'].mRMR(k=7, verbose=0)
+                else:
+                    selected_features = preprocessed_data.X_train.columns
+
+
+                self.models[method][cluster]['X_train'] = preprocessed_data.X_train[selected_features[:7]]
+                self.models[method][cluster]['X_test']  = preprocessed_data.X_test[selected_features[:7]]
                 self.models[method][cluster]['Y_train'] = preprocessed_data.Y_train
                 self.models[method][cluster]['Y_test']  = preprocessed_data.Y_test
-
 
 
     # Clustering based on lat long data

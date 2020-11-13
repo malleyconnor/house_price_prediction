@@ -144,8 +144,8 @@ def plot_train_test_split(long_train, long_test, lat_train, lat_test, save_dir='
     bg = plt.imread(background_dir)
     fig, ax = plt.subplots()
     ax.imshow(bg, extent=[0, 1, 0, 1])
-    ax.scatter(long_tr, lat_tr, color=cmap.to_rgba(0), s=marker_size, label='Train')
     ax.scatter(long_te, lat_te, color=cmap.to_rgba(1), s=marker_size, label='Test')
+    ax.scatter(long_tr, lat_tr, color=cmap.to_rgba(0), s=marker_size, label='Train')
     ax.axis('off')
 
     # Creating Legend

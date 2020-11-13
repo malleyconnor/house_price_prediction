@@ -133,10 +133,13 @@ class DataPreprocessor(object):
         correlations = []
         for i, column in enumerate(self.X_train.columns):
             corr = 0
-            try:
-                corr = pearsonr(self.X_train[column], self.Y_train[self.label])[0]
-            except PearsonRConstantInputWarning():
-                corr = 0
+            if len(list(set(self.X_train[column]))) <= 1:
+                corr = 1e-10
+            else:
+                try:
+                    corr = pearsonr(self.X_train[column], self.Y_train[self.label])[0]
+                except RuntimeWarning:
+                    print('Runtime warning')
 
             correlations.append((column, corr))
 
@@ -207,7 +210,13 @@ class DataPreprocessor(object):
         correlations = []
         for i, i_column in enumerate(X.columns):
             for j, j_column in enumerate(X.columns):
-                correlations.append(abs(pearsonr(X[i_column], X[j_column])[0]))
+                if (len(list(set(X[i_column]))) <= 1 or len(list(set(X[j_column]))) <= 1):
+                    correlations.append(1e-10)
+                else:
+                    try:
+                        correlations.append(abs(pearsonr(X[i_column], X[j_column])[0]))
+                    except RuntimeWarning:
+                        print('rt warning')
 
         return correlations
 
@@ -222,9 +231,12 @@ class DataPreprocessor(object):
         return f_scores
 
     def compute_relevance_redundancy(self, x, y):
-        f_scores = f_regression(x, y[y.columns[0]])[0]
-        f_scores /= np.max(f_scores)
-        cor = self.compute_self_correlation(x)
+        try:
+            f_scores = f_regression(x, y[y.columns[0]])[0]
+            f_scores /= np.max(f_scores)
+            cor = self.compute_self_correlation(x)
+        except RuntimeWarning:
+            print('rt warning')
 
         s = len(f_scores)
         rel = 0
@@ -285,23 +297,26 @@ class DataPreprocessor(object):
             for j, col in enumerate(remaining_features):
                 features = selected_features.copy()
                 features.append(col)
-                rel, red = self.compute_relevance_redundancy(self.X_train[features], self.Y_train)
+                try:
+                    rel, red = self.compute_relevance_redundancy(self.X_train[features], self.Y_train)
 
-                value = 0
-                if (additive):
-                    value = rel - red
-                else:
-                    value = rel / red
+                    value = 0
+                    if (additive):
+                        value = rel - red
+                    else:
+                        value = rel / red
 
-                if (best == None or value > best):
-                    best = value
-                    best_col = col
+                    if (best == None or value > best):
+                        best = value
+                        best_col = col
 
-                if (verbose == 2):
-                    print ("   Feature ", col, ":")
-                    print ("     rel = ", rel)
-                    print ("     red = ", red)
-                    print ("     value = ", value, "\n")
+                    if (verbose == 2):
+                        print ("   Feature ", col, ":")
+                        print ("     rel = ", rel)
+                        print ("     red = ", red)
+                        print ("     value = ", value, "\n")
+                except RuntimeWarning:
+                    print('Runtime Warning')
 
             # Add the feature to selected features and continue
             selected_features.append(best_col)

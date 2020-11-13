@@ -40,7 +40,7 @@ if __name__ == '__main__':
     test_size = 0.2
     print('Preprocessing data before clustering... (Just add option for no clustering)')
     preprocessed_data = DataPreprocessor('./data/kc_house_data.csv', drop_features=['date', 'id'], 
-    save_dir='./data', test_size=test_size, normalize_labels=False, save_plots=False, plotDir=plotDir,
+    save_dir='./data', test_size=test_size, normalize_labels=False, save_plots=True, plotDir=plotDir,
     omit_norm_features=['zipcode', 'lat', 'long'])
 
     doMRMR = False
@@ -54,7 +54,8 @@ if __name__ == '__main__':
     # Creating one specific type of cluster model
     print('Initializing clustering model...')
     cm = cluster_model(X, Y, X_train, X_test, Y_train, Y_test, cluster_type='latlong', 
-    cluster_methods=['dbscan', 'kmeans'], regressors=['knn', 'lr'], plot_clusters=True)
+    cluster_methods=['dbscan', 'kmeans'], regressors=['knn', 'lr'], plot_clusters=True,
+    doMRMR=True)
     cm.evaluate()
 
     # Baseline mRMR + linear regression
