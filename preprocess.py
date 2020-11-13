@@ -25,21 +25,32 @@ class DataPreprocessor(object):
         self.test_size = 0.2
         self.normalize_features = normalize_features
         self.normalize_labels = normalize_labels
+        self.omit_norm_features = omit_norm_features
+
+        # Splitting data into features/labels
+        if input_path:
+            self.X = pd.read_csv(self.input_path)
+            self.Y = pd.DataFrame(self.X[self.label])
 
         os.makedirs(plotDir, exist_ok=True)
         os.makedirs(save_dir, exist_ok=True)
 
         self.input_split = input_split
-        self.X_train = xtrain
-        self.X_test  = xtest
-        self.Y_train = ytrain
-        self.Y_test  = ytest
+        if input_split:
+            self.X_train = xtrain
+            self.X_test  = xtest
+            self.Y_train = ytrain
+            self.Y_test  = ytest
+
+        #self.rf_rank()
         self.__preprocess_data()
+
+        if (save_plots):
+            plot_train_test_split(self.X_train['long'], self.X_test['long'], 
+                self.X_train['lat'], self.X_test['lat'])
 
         self.get_feature_stats()
         self.get_correlations()
-        self.rf_rank()
-
 
         # Plots histograms
         if (save_plots):
@@ -84,25 +95,25 @@ class DataPreprocessor(object):
     # TODO: Incorporate splitting from decision tree (GINI/Entropy) to bin data as well (if needed)
     def __preprocess_data(self):
         if (not self.input_split):
-            # Splitting data into features/labels
-            X = pd.read_csv(self.input_path)
-            Y = pd.DataFrame(X[self.label])
 
             # Dropping label and irrelevant features from X
-            X.drop(self.label, inplace=True, axis=1)
-            X.drop(self.drop_features, inplace=True, axis=1)
-
-            self.X = X.copy()
-            self.Y = Y.copy()
+            self.X.drop(self.label, inplace=True, axis=1)
+            self.X.drop(self.drop_features, inplace=True, axis=1)
 
             self.X_train, self.X_test, self.Y_train, self.Y_test =\
-            train_test_split(X, Y, test_size=self.test_size, shuffle=True, random_state=None)
+            train_test_split(self.X, self.Y, test_size=self.test_size, shuffle=True, random_state=None)
             self.min_norm = np.min(self.Y_train)
             self.max_norm = np.max(self.Y_train)
 
         # Doing normalization
         if self.normalize_features:
-            self.normalize_data(self.normalize_labels)
+            self.normalize_data(self.normalize_labels, self.omit_norm_features)
+
+        self.X_train.reset_index(inplace=True, drop=True)
+        self.X_test.reset_index(inplace=True, drop=True)
+        self.Y_train.reset_index(inplace=True, drop=True)
+        self.Y_test.reset_index(inplace=True, drop=True) 
+
         
         # Exporting normalized data to CSV
         if (self.save_dir != None):    

@@ -13,7 +13,7 @@ from sklearn.metrics import mean_absolute_error, median_absolute_error
 
 class cluster_model(object):
     def __init__(self, X, Y, X_train, X_test, Y_train, Y_test, cluster_type='latlong', 
-    cluster_methods=['dbscan', 'kmeans'], regressors=['knn'], plot_clusters=False, plotDir='./figures'):
+    cluster_methods=['dbscan', 'kmeans'], regressors=['knn'], plot_clusters=True, plotDir='./figures'):
         self.X = X
         self.Y = Y
         self.X_train = X_train
@@ -55,11 +55,12 @@ class cluster_model(object):
 
     # Clustering based on lat long data
     def __latlong_cluster(self, eps_vals=None, core_neighbors_vals=None):
+        print('Getting lat/long clusterings')
         X_long = np.array(self.X_train['long'])
         X_lat  = np.array(self.X_train['lat'])
 
-        if (self.plot_clusters):
-            plot_latlong_clusters(self.X['long'], self.X['lat'], [0] * len(X_long), save_dir=self.plotDir, save_name="latlong_mapping")
+        #if (self.plot_clusters):
+        #    plot_latlong_clusters(self.X['long'], self.X['lat'], [0] * len(X_long), save_dir=self.plotDir, save_name="latlong_mapping")
 
         latlong = np.zeros((len(X_lat), 2))
         for i in range(len(X_lat)):
@@ -77,37 +78,38 @@ class cluster_model(object):
                 self.__find_best_dbscan()
 
     # TODO: Create plot which includes train/test split
-    def __find_best_dbscan(self, eps_vals=None, core_neighbors_vals=None, createPlots=False):
-        print('Finding optimal Eps for DBSCAN...')
-        max_k = 100
-        k_nearest_distances = np.zeros((max_k, len(self.X_train)))
+    def __find_best_dbscan(self, eps_vals=None, core_neighbors_vals=None, createPlots=False, precomputed=False):
+        print('Getting DBSCAN clustering')
+        if not precomputed:
+            max_k = 100
+            k_nearest_distances = np.zeros((max_k, len(self.X_train)))
 
-        # Getting distances between k-nearest neighbors in specified range
-        cdist_matrix = distance.cdist(self.X_train[['lat', 'long']], self.X_train[['lat', 'long']])
-        np.fill_diagonal(cdist_matrix, sys.maxsize)
-        for i in range(len(self.X_train)):
-            k_nearest_distances[:,i] = cdist_matrix[i, np.argpartition(cdist_matrix[i,:], max_k)[:max_k]]
-        k_nearest_distances = np.sort(k_nearest_distances, axis=1)
+            # Getting distances between k-nearest neighbors in specified range
+            cdist_matrix = distance.cdist(self.X_train[['lat', 'long']], self.X_train[['lat', 'long']])
+            np.fill_diagonal(cdist_matrix, sys.maxsize)
+            for i in range(len(self.X_train)):
+                k_nearest_distances[:,i] = cdist_matrix[i, np.argpartition(cdist_matrix[i,:], max_k)[:max_k]]
+            k_nearest_distances = np.sort(k_nearest_distances, axis=1)
 
-        # Getting best eps for each value of k
-        # (Maximize 2nd derivative to find best eps)
-        optimal_eps = np.zeros(max_k)
-        distances_2nd_diff = np.diff(k_nearest_distances, n=2, axis=1)
-        max_diffs = np.argmax(distances_2nd_diff, axis=1)
-        for i in range(max_k):
-            optimal_eps[i] = k_nearest_distances[i, max_diffs[i]]
+            # Getting best eps for each value of k
+            # (Maximize 2nd derivative to find best eps)
+            optimal_eps = np.zeros(max_k)
+            distances_2nd_diff = np.diff(k_nearest_distances, n=2, axis=1)
+            max_diffs = np.argmax(distances_2nd_diff, axis=1)
+            for i in range(max_k):
+                optimal_eps[i] = k_nearest_distances[i, max_diffs[i]]
 
-       
-        if createPlots:
-            save_dir = self.plotDir + '/DBSCAN/eps_neighbor_search/'
-            os.makedirs(save_dir, exist_ok=True)
-            plot_eps_neighbor_search(k_nearest_distances, optimal_eps, save_dir)
+        
+            if createPlots:
+                save_dir = self.plotDir + '/DBSCAN/eps_neighbor_search/'
+                os.makedirs(save_dir, exist_ok=True)
+                plot_eps_neighbor_search(k_nearest_distances, optimal_eps, save_dir)
 
-
+            
         # DBSCAN clustering
         # (Fixing min_samples = 50 here)
-        core_neighbors_vals = [25]
-        eps_vals = [optimal_eps[core_neighbors_vals[0]-1]]
+        core_neighbors_vals = [75]
+        eps_vals = [0.015]
         for eps in eps_vals:
             for core_neighors in core_neighbors_vals:
                     self.dbscan = DBSCAN(eps=eps, min_samples=core_neighors).fit(self.cluster_features)
@@ -115,6 +117,7 @@ class cluster_model(object):
                         plot_latlong_clusters(self.X_train['long'], self.X_train['lat'], self.dbscan.labels_, 
                         save_dir=self.plotDir+"/DBSCAN", save_name=("latlong_DBSCAN_%s_%s" % (eps, core_neighors)))
 
+        print('%d different clusters' % len(list(set(self.dbscan.labels_))))
         return self.dbscan
 
     # TODO: Change to actually return the best model
