@@ -13,13 +13,13 @@ from sklearn.metrics import mean_absolute_error, median_absolute_error
 
 class cluster_model(object):
     def __init__(self, X, Y, X_train, X_test, Y_train, Y_test, cluster_type='latlong', 
-    cluster_methods=['dbscan', 'kmeans'], regressors=['knn'], plot_clusters=True, plotDir='./figures', doMRMR=False):
-        self.X = X
-        self.Y = Y
-        self.X_train = X_train
-        self.X_test  = X_test
-        self.Y_train = Y_train
-        self.Y_test  = Y_test
+    cluster_methods=['dbscan', 'kmeans', 'none'], regressors=['knn'], plot_clusters=True, plotDir='./figures', doMRMR=False):
+        self.X = X.copy()
+        self.Y = Y.copy()
+        self.X_train = X_train.copy()
+        self.X_test  = X_test.copy()
+        self.Y_train = Y_train.copy()
+        self.Y_test  = Y_test.copy()
         self.cluster_type = cluster_type
         self.cluster_methods = cluster_methods
         self.regressors = regressors
@@ -61,10 +61,10 @@ class cluster_model(object):
                     selected_features = preprocessed_data.X_train.columns
 
 
-                self.models[method][cluster]['X_train'] = preprocessed_data.X_train[selected_features[:7]]
-                self.models[method][cluster]['X_test']  = preprocessed_data.X_test[selected_features[:7]]
-                self.models[method][cluster]['Y_train'] = preprocessed_data.Y_train
-                self.models[method][cluster]['Y_test']  = preprocessed_data.Y_test
+                self.models[method][cluster]['X_train'] = preprocessed_data.X_train[selected_features[:7]].copy()
+                self.models[method][cluster]['X_test']  = preprocessed_data.X_test[selected_features[:7]].copy()
+                self.models[method][cluster]['Y_train'] = preprocessed_data.Y_train.copy()
+                self.models[method][cluster]['Y_test']  = preprocessed_data.Y_test.copy()
 
 
     # Clustering based on lat long data
@@ -227,8 +227,14 @@ class cluster_model(object):
             elif method == 'kmeans':
                 self.models['kmeans'] = {}
                 self.__get_kmeans_train_and_test_sets(self.models['kmeans'])
-            elif method == 'None':
+            elif method == 'none':
+                self.models['none'] = {}
                 self.models[method]['model'] = None
+                self.models[method][0] = {}
+                self.models[method][0]['X_train'] = self.X_train.copy()
+                self.models[method][0]['X_test']  = self.X_test.copy()
+                self.models[method][0]['Y_train'] = self.Y_train.copy()
+                self.models[method][0]['Y_test']  = self.Y_test.copy()
 
         self.__preprocess_clusters()
         self.__fit_regressors()
@@ -244,14 +250,18 @@ class cluster_model(object):
         return clusters
 
     # Evaluates the model on X_test set
-    def evaluate(self):
+    def evaluate(self, verbose=1):
         predictions = {}
         labels      = {}
+        self.r2_score = {}
+        self.rmse = {}
 
         # Getting prediction scores for each regressor in each cluster
         for method in self.cluster_methods:
             clusters = self.__get_cluster_labels(method)
 
+            self.r2_score[method] = {}
+            self.rmse[method] = {}
             for regressor in self.regressors:
                 predictions[regressor] = []
                 labels[regressor] = []
@@ -263,8 +273,15 @@ class cluster_model(object):
                 # Getting total prediction score of the whole model
                 score = r2_score(labels[regressor], predictions[regressor])
                 rmse  = mean_squared_error(labels[regressor], predictions[regressor], squared=False) 
-                print('R^2 score for %s clustering with %s regressor: %f' % (method, regressor, score))
-                print('RMSE for %s clustering with %s regressor: %f' % (method, regressor, rmse))
+
+                if verbose:
+                    print('R^2 score for %s clustering with %s regressor: %.4f' % (method, regressor, score))
+                    print('RMSE for %s clustering with %s regressor: %.4f' % (method, regressor, rmse))
+
+                self.r2_score[method][regressor] = score
+                self.rmse[method][regressor]     = rmse
+
+
 
 
 

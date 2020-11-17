@@ -37,10 +37,10 @@ class DataPreprocessor(object):
 
         self.input_split = input_split
         if input_split:
-            self.X_train = xtrain
-            self.X_test  = xtest
-            self.Y_train = ytrain
-            self.Y_test  = ytest
+            self.X_train = xtrain.copy()
+            self.X_test  = xtest.copy()
+            self.Y_train = ytrain.copy()
+            self.Y_test  = ytest.copy()
 
         #self.rf_rank()
         self.__preprocess_data()
@@ -104,6 +104,12 @@ class DataPreprocessor(object):
             train_test_split(self.X, self.Y, test_size=self.test_size, shuffle=True, random_state=None)
             self.min_norm = np.min(self.Y_train)
             self.max_norm = np.max(self.Y_train)
+        else:
+            #self.X_train.drop(self.label, inplace=True, axis=1)
+            self.X_train = self.X_train.drop(self.drop_features, axis=1)
+            #self.X_test.drop(self.label, inplace=True, axis=1)
+            self.X_test  = self.X_test.drop(self.drop_features, axis=1)
+
 
         # Doing normalization
         if self.normalize_features:
