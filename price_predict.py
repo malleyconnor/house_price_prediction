@@ -69,6 +69,11 @@ if __name__ == '__main__':
 
         cm = cluster_model(X_0, Y_0, X_train, X_test, Y_train, Y_test, cluster_type='latlong',\
         cluster_methods=methods, regressors=regressors, plot_clusters=True, doMRMR=True)
+
+        if savePlots:
+            plot_train_test_split(X_train['long'], X_test['long'], X_train['lat'], X_test['lat'], k=k_iter+1)
+            #plot_pearson_matrix(X_train[list(X_train.columns).remove('id')], Y_train, k=k_iter+1)
+
         cm.evaluate()
 
         # Mean evaluation scores
@@ -89,7 +94,7 @@ if __name__ == '__main__':
             mean_rmse[method][regressor] /= k
 
             print('Average R^2 score (%d-fold, %s, %s): %.4f' % (k, method, regressor, mean_r2_score[method][regressor]))
-            print('Average RMSE (%d-fold, %s, %s): %.4f' % (k, method, regressor, mean_rmse[method][regressor]))
+            print('Average RMSE (%d-fold, %s, %s): %.4f\n' % (k, method, regressor, mean_rmse[method][regressor]))
 
 
     # Baseline mRMR + linear regression

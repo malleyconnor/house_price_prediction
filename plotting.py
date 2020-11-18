@@ -2,8 +2,10 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib
+import seaborn as sn
 from scipy.stats import pearsonr
 from matplotlib.lines import Line2D
+import os
 
 featureTypes = {
     'bedrooms'      : 'ordinal',
@@ -119,16 +121,16 @@ def plot_lat_long_hist(X, bins=(5,5), save_path='./figures/latlong_hist.png'):
 def plot_eps_neighbor_search(k_nearest_distances, optimal_eps, save_dir):
     X = np.linspace(1, len(k_nearest_distances[0,:]), len(k_nearest_distances[0]), endpoint=True)
     for kval in range(1, len(k_nearest_distances[:,0])+1):
-        plt.scatter(X, k_nearest_distances[kval-1,:])
+        plt.plot(X, k_nearest_distances[kval-1,:])
         plt.xlabel('Sample #')
         plt.ylabel('Lat/Long Distance to %d-th nearest neighbor' % (kval))
         plt.title('DBSCAN Eps Optimization Plot')
         plt.hlines(optimal_eps[kval-1], xmin=0, xmax=len(X)+1, linestyles='dashed')
-        plt.text(0, optimal_eps[kval-1]+0.02, 'Optimal Eps = %.3f' % (optimal_eps[kval-1]))
+        plt.text(0, optimal_eps[kval-1]+0.02, 'Optimal Eps ~= %.3f' % (optimal_eps[kval-1]))
         plt.savefig(save_dir+'k_%d.png' % (kval), dpi=300)
         plt.clf()
 
-def plot_train_test_split(long_train, long_test, lat_train, lat_test, save_dir='./figures', background_dir='./map.png', marker_size=0.05):
+def plot_train_test_split(long_train, long_test, lat_train, lat_test, save_dir='./figures', background_dir='./map.png', marker_size=0.03, k=-1):
 
     # Transform lat and long with map offset
     mc = [47.0451, -122.5736, 47.8116, -120.9609]
@@ -153,8 +155,47 @@ def plot_train_test_split(long_train, long_test, lat_train, lat_test, save_dir='
         Line2D([0], [0], color=cmap.to_rgba(1), marker='o', markersize=8, label='Test')]
     plt.legend(handles=legend_elements)
     
+    if k == -1:
+        plt.savefig('%s/train_test_split.png' % (save_dir), dpi=300)
+    else:
+        plt.savefig('%s/train_test_split_%d.png' % (save_dir, k), dpi=300)
 
-    plt.savefig('%s/train_test_split.png' % (save_dir), dpi=300)
     plt.clf()
     fig.clf()
+    plt.close('all')
+
+
+def plot_kmeans_sse(sse_vals, save_dir='./figures/kmeans'):
+    os.makedirs(save_dir, exist_ok=True)
+    x = np.linspace(1, len(sse_vals), len(sse_vals), endpoint=True)
+
+    plt.plot(x, sse_vals)
+    plt.xticks(x[::2])
+    plt.title('K-Means SSE vs. k')
+    plt.xlabel('k')
+    plt.ylabel('SSE')
+
+    plt.savefig(save_dir+'/kmeans_sse_vs_k.png', dpi=300)
+    plt.clf()
+    plt.close('all')
+
+
+def plot_pearson_matrix(X_train, Y_train, label='price', save_dir='./figures/correlation', k=-1):
+    temp_df = X_train.copy()
+    temp_df[label] = Y_train[label]
+
+    # Taken from pandas docs
+    def histogram_intersection(a, b):
+        v = np.minimum(a, b).sum().round(decimals=2)
+        return v
+    
+    corr_matrix = temp_df.corr(method=histogram_intersection)
+    sn.heatmap(corr_matrix)
+
+    if k == -1:
+        plt.savefig('%s/pearson_corr_matrix.png' % (save_dir), dpi=300)
+    else:
+        plt.savefig('%s/pearson_corr_matrix_%d.png' % (save_dir, k), dpi=300)
+
+    plt.clf()
     plt.close('all')

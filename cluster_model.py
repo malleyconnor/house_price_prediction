@@ -91,8 +91,7 @@ class cluster_model(object):
             elif method == 'dbscan':
                 self.__find_best_dbscan()
 
-    # TODO: Create plot which includes train/test split
-    def __find_best_dbscan(self, eps_vals=None, core_neighbors_vals=None, createPlots=False, precomputed=False):
+    def __find_best_dbscan(self, eps_vals=None, core_neighbors_vals=None, createPlots=True, precomputed=False, default_eps=0.0175):
         print('Getting DBSCAN clustering')
         if not precomputed:
             max_k = 100
@@ -117,13 +116,15 @@ class cluster_model(object):
             if createPlots:
                 save_dir = self.plotDir + '/DBSCAN/eps_neighbor_search/'
                 os.makedirs(save_dir, exist_ok=True)
-                plot_eps_neighbor_search(k_nearest_distances, optimal_eps, save_dir)
+                
+                def_eps = np.full(max_k, fill_value=default_eps)
+                plot_eps_neighbor_search(k_nearest_distances, def_eps, save_dir)#optimal_eps, save_dir)
 
             
         # DBSCAN clustering
         # (Fixing min_samples = 50 here)
         core_neighbors_vals = [75]
-        eps_vals = [0.015]
+        eps_vals = [default_eps]
         for eps in eps_vals:
             for core_neighors in core_neighbors_vals:
                     self.dbscan = DBSCAN(eps=eps, min_samples=core_neighors).fit(self.cluster_features)
@@ -135,17 +136,24 @@ class cluster_model(object):
         return self.dbscan
 
     # TODO: Change to actually return the best model
-    def __find_best_kmeans(self, krange=None):
+    def __find_best_kmeans(self, krange=None, precomputed=True, default_k=7):
         print('Finding best kmeans clustering...')
-        if not krange:
-            krange = range(2, 11)
-            # KMeans clustering
-            for nclusters in krange:
-                self.kmeans = KMeans(n_clusters=nclusters).fit(self.cluster_features)
-                if (self.plot_clusters):
-                    plot_latlong_clusters(self.X_train['long'], self.X_train['lat'], self.kmeans.labels_, save_dir=self.plotDir+"/kmeans", 
-                    save_name=("latlong_kmeans_%s_clusters" % nclusters))
+        if not precomputed:
+            sse_vals = []
+            if not krange:
+                krange = range(2, 20)
+                # KMeans clustering
+                for nclusters in krange:
+                    self.kmeans = KMeans(n_clusters=nclusters).fit(self.cluster_features)
+                    if (self.plot_clusters):
+                        plot_latlong_clusters(self.X_train['long'], self.X_train['lat'], self.kmeans.labels_, save_dir=self.plotDir+"/kmeans", 
+                        save_name=("latlong_kmeans_%s_clusters" % nclusters))
 
+                    sse_vals.append(self.kmeans.inertia_)
+
+            plot_kmeans_sse(sse_vals)
+        else:
+            self.kmeans = KMeans(n_clusters=default_k).fit(self.cluster_features)
         return self.kmeans
 
     # Gets cluster train sets for DBSCAN model
