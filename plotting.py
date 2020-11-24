@@ -183,14 +183,11 @@ def plot_kmeans_sse(sse_vals, save_dir='./figures/kmeans'):
 def plot_pearson_matrix(X_train, Y_train, label='price', save_dir='./figures/correlation', k=-1):
     temp_df = X_train.copy()
     temp_df[label] = Y_train[label]
-
-    # Taken from pandas docs
-    def histogram_intersection(a, b):
-        v = np.minimum(a, b).sum().round(decimals=2)
-        return v
     
-    corr_matrix = temp_df.corr(method=histogram_intersection)
-    sn.heatmap(corr_matrix)
+    corr_matrix = temp_df.corr(method='pearson')
+    sn.heatmap(corr_matrix, cbar_kws={'label' : 'Pearson Correlation'})
+    plt.title('Pearson Correlation Matrix')
+    plt.tight_layout()
 
     if k == -1:
         plt.savefig('%s/pearson_corr_matrix.png' % (save_dir), dpi=300)
