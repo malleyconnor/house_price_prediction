@@ -50,22 +50,13 @@ if __name__ == '__main__':
     r2_scores = {}
     rmse_scores = {}
     methods = ['dbscan', 'kmeans', 'none']
-    regressors = ['knn', 'lr', 'adaboost', 'gradientboosting', 'randomforest', 'decisiontree']
-    regressor_names = ['KNN', 'Linear Regression', 'AdaBoosting', 'Gradient Boosting', 'Random Forest', 'Decision Tree']
+    regressors = ['knn', 'lr', 'pr2', 'pr3', 'adaboost', 'gradientboosting', 'randomforest', 'decisiontree']
+    regressor_names = ['KNN', 'Linear Regression', 'Poly Reg(n=2)', 'Poly Reg(n=3)', 'AdaBoosting', 'Gradient Boosting', 'Random Forest', 'Decision Tree']
     for k_iter, (train_inds, test_inds) in enumerate(kf.split(X_0)):
         print('Processing split %d' % (k_iter+1))
         X_train, X_test = X_0.iloc[train_inds].copy(), X_0.iloc[test_inds].copy()
         Y_train, Y_test = Y_0.iloc[train_inds].copy(), Y_0.iloc[test_inds].copy()
 
-        # Initializing data for clustering
-        #preprocessed_data = DataPreprocessor(drop_features=['date', 'id'], 
-        #save_dir='./data', test_size=test_size, normalize_labels=False, save_plots=True, plotDir=plotDir,
-        #omit_norm_features=['zipcode', 'lat', 'long'], xtrain=X_train, xtest=X_test,
-        #ytrain=Y_train, ytest=Y_test, input_split=True)
-
-        # Initial Preprocessing of data
-        #X, Y, X_train, X_test, Y_train, Y_test = preprocessed_data.X, preprocessed_data.Y,\
-        #preprocessed_data.X_train, preprocessed_data.X_test, preprocessed_data.Y_train, preprocessed_data.Y_test 
 
         # Creating one specific type of cluster model
         print('Initializing clustering model...')
@@ -120,9 +111,9 @@ if __name__ == '__main__':
 
         print ("Scores:\n", scores)
 
-        r2_plot = scores.boxplot(by='Model', column='R2', positions=[1, 7, 15, 21, 27, 35])
+        r2_plot = scores.boxplot(by='Model', column='R2', positions=[1, 7, 15, 21, 27, 35, 42, 50])
         r2_plot.get_figure().savefig('./figures/'+method+'_R2_plot.png')
-        rmse_plot = scores.boxplot(by='Model', column='RMSE', positions=[1, 7, 15, 21, 27, 35])
+        rmse_plot = scores.boxplot(by='Model', column='RMSE', positions=[1, 7, 15, 21, 27, 35, 42, 50])
         rmse_plot.get_figure().savefig('./figures/'+method+'_RMSE_plot.png')
 
     '''
