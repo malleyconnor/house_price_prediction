@@ -15,7 +15,8 @@ from sklearn.metrics import mean_absolute_error, median_absolute_error
 
 class cluster_model(object):
     def __init__(self, X, Y, X_train, X_test, Y_train, Y_test, cluster_type='latlong', 
-    cluster_methods=['dbscan', 'kmeans', 'none'], regressors=['knn'], plot_clusters=True, plotDir='./figures', doMRMR=False):
+    cluster_methods=['dbscan', 'kmeans', 'none'], regressors=['knn'], plot_clusters=True, 
+    plotDir='./figures', doMRMR=False, doRF=False):
         self.X = X.copy()
         self.Y = Y.copy()
         self.X_train = X_train.copy()
@@ -29,6 +30,7 @@ class cluster_model(object):
         self.plot_clusters = plot_clusters
         self.test_size = 0.2
         self.doMRMR = doMRMR
+        self.doRF = doRF
 
         if cluster_type == 'latlong':
             self.__latlong_cluster()
@@ -44,7 +46,7 @@ class cluster_model(object):
             clusters = self.__get_cluster_labels(method)
             for cluster in clusters:
                 preprocessed_data = DataPreprocessor(xtrain=self.models[method][cluster]['X_train'], xtest=self.models[method][cluster]['X_test'], 
-                ytrain=self.models[method][cluster]['Y_train'], ytest=self.models[method][cluster]['Y_test'], drop_features=['date', 'id'],
+                ytrain=self.models[method][cluster]['Y_train'], ytest=self.models[method][cluster]['Y_test'], drop_features=['date', 'id', 'zipcode'],
                 save_dir='./data/'+str(method)+'/'+str(cluster), test_size=self.test_size, normalize_labels=False, save_plots=False, 
                 plotDir=self.plotDir+'/'+str(method)+'/'+str(cluster), input_split=True, omit_norm_features=[])
 
@@ -60,6 +62,8 @@ class cluster_model(object):
                 k = 8
                 if (self.doMRMR):
                     selected_features = self.models[method][cluster]['preprocessed_data'].mRMR(k=k, verbose=0)
+                elif (self.doRF):
+                    selected_features = self.models[method][cluster]['preprocessed_data'].rf_rank(threshold=0.01)
                 else:
                     selected_features = preprocessed_data.X_train.columns
 
