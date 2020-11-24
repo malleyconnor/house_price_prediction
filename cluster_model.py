@@ -6,7 +6,8 @@ from preprocess import *
 from sklearn.metrics import r2_score, mean_squared_error
 from scipy.spatial import distance
 from sklearn.cluster import KMeans, DBSCAN
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor, GradientBoostingRegressor, BaggingRegressor
+from sklearn.tree import DecisionTreeRegressor
 from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, median_absolute_error
@@ -196,11 +197,33 @@ class cluster_model(object):
                         model[label]['knn'] = {}
                         model[label]['knn']['model'] = KNeighborsRegressor(n_neighbors=5, weights='distance')
                         model[label]['knn']['model'].fit(model[label]['X_train'], model[label]['Y_train']['price'])
+
                     elif regressor == 'lr':
                         model[label]['lr'] = {}
                         model[label]['lr']['model'] = LinearRegression(normalize=True)
-                        model[label]['lr']['model'].fit(model[label]['X_train'],
-                            model[label]['Y_train']['price'])
+                        model[label]['lr']['model'].fit(model[label]['X_train'], model[label]['Y_train']['price'])
+
+                    elif regressor == 'adaboost':
+                        model[label]['adaboost'] = {}
+                        model[label]['adaboost']['model'] = AdaBoostRegressor(n_estimators=100, learning_rate=0.2, loss='exponential')
+                        model[label]['adaboost']['model'].fit(model[label]['X_train'], model[label]['Y_train']['price'])
+
+                    elif regressor == 'gradientboosting':
+                        model[label]['gradientboosting'] = {}
+                        model[label]['gradientboosting']['model'] = GradientBoostingRegressor(n_estimators=400, learning_rate=0.1, loss='ls', max_depth=5, min_samples_split=2)
+                        model[label]['gradientboosting']['model'].fit(model[label]['X_train'], model[label]['Y_train']['price'])
+
+                    elif regressor == 'randomforest':
+                        model[label]['randomforest'] = {}
+                        model[label]['randomforest']['model'] = RandomForestRegressor(n_estimators=400)
+                        model[label]['randomforest']['model'].fit(model[label]['X_train'], model[label]['Y_train']['price'])
+
+                    elif regressor == 'decisiontree':
+                        model[label]['decisiontree'] = {}
+                        model[label]['decisiontree']['model'] = DecisionTreeRegressor()
+                        model[label]['decisiontree']['model'].fit(model[label]['X_train'], model[label]['Y_train']['price'])
+
+
 
     def __get_kmeans_train_and_test_sets(self, model):
         model['model'] = self.kmeans

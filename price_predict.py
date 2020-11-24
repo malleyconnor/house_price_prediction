@@ -47,8 +47,11 @@ if __name__ == '__main__':
     X_0.drop('price', inplace=True, axis=1)
     mean_r2_score = {}
     mean_rmse = {}
+    r2_scores = {}
+    rmse_scores = {}
     methods = ['dbscan', 'kmeans', 'none']
-    regressors = ['knn', 'lr']
+    regressors = ['knn', 'lr', 'adaboost', 'gradientboosting', 'randomforest', 'decisiontree']
+    regressor_names = ['KNN', 'Linear Regression', 'AdaBoosting', 'Gradient Boosting', 'Random Forest', 'Decision Tree']
     for k_iter, (train_inds, test_inds) in enumerate(kf.split(X_0)):
         print('Processing split %d' % (k_iter+1))
         X_train, X_test = X_0.iloc[train_inds].copy(), X_0.iloc[test_inds].copy()
@@ -81,20 +84,53 @@ if __name__ == '__main__':
             if method not in mean_r2_score.keys():
                 mean_r2_score[method] = {}
                 mean_rmse[method] = {}
+                r2_scores[method] = {}
+                rmse_scores[method] = {}
             for regressor in cm.regressors:
                 if regressor not in mean_r2_score[method].keys():
                     mean_r2_score[method][regressor] = 0
                     mean_rmse[method][regressor] = 0
+                    r2_scores[method][regressor] = []
+                    rmse_scores[method][regressor] = []
                 mean_r2_score[method][regressor] += cm.r2_score[method][regressor]
                 mean_rmse[method][regressor] += cm.rmse[method][regressor]
+                r2_scores[method][regressor].append(cm.r2_score[method][regressor])
+                rmse_scores[method][regressor].append(cm.rmse[method][regressor])
 
     for method in methods:
+        r2_list = []
+        rmse_list = []
+
         for regressor in regressors:
             mean_r2_score[method][regressor] /= k
             mean_rmse[method][regressor] /= k
 
+            r2_list.append(r2_scores[method][regressor])
+            rmse_list.append(rmse_scores[method][regressor])
+
             print('Average R^2 score (%d-fold, %s, %s): %.4f' % (k, method, regressor, mean_r2_score[method][regressor]))
             print('Average RMSE (%d-fold, %s, %s): %.4f\n' % (k, method, regressor, mean_rmse[method][regressor]))
+        
+        scores = pd.DataFrame({
+            'Model' : regressor_names,
+            'R2' : r2_list,
+            'RMSE' : rmse_list
+        })
+        scores = scores.explode('R2').explode('RMSE')
+
+        print ("Scores:\n", scores)
+
+        r2_plot = scores.boxplot(by='Model', column='R2', positions=[1, 7, 15, 21, 27, 35])
+        r2_plot.get_figure().savefig('./figures/'+method+'_R2_plot.png')
+        rmse_plot = scores.boxplot(by='Model', column='RMSE', positions=[1, 7, 15, 21, 27, 35])
+        rmse_plot.get_figure().savefig('./figures/'+method+'_RMSE_plot.png')
+
+    '''
+    pd.DataFrame({
+        'Model' : ['KNN', 'Linear Regression', 'AdaBoosting', 'Gradient Boosting Regressor', 'Random Forest Regressor', 'Decision Tree Regressor'],
+        'R2_kmeans' : []
+    })
+    '''
 
 
     # Baseline mRMR + linear regression
