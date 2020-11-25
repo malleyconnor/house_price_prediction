@@ -11,6 +11,7 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, median_absolute_error
+import xgboost
 
 class cluster_model(object):
     def __init__(self, X, Y, X_train, X_test, Y_train, Y_test, cluster_type='latlong', 
@@ -222,6 +223,11 @@ class cluster_model(object):
                         model[label]['decisiontree'] = {}
                         model[label]['decisiontree']['model'] = DecisionTreeRegressor()
                         model[label]['decisiontree']['model'].fit(model[label]['X_train'], model[label]['Y_train']['price'])
+
+                    elif regressor == 'xgboost':
+                        model[label]['xgboost'] = {}
+                        model[label]['xgboost']['model'] = xgboost.XGBRegressor(n_estimators=900, learning_rate=0.05, max_depth=5)
+                        model[label]['xgboost']['model'].fit(model[label]['X_train'], model[label]['Y_train']['price'])
 
 
 

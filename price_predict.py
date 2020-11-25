@@ -8,6 +8,7 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import PolynomialFeatures
 import scipy
 import statistics
+import seaborn as sns
 import sys, getopt
 import os
 
@@ -42,16 +43,20 @@ if __name__ == '__main__':
     # KFold Split and Evaluation
     k = 5
     X_0 = pd.read_csv('./data/kc_house_data.csv')
+    X_0 = X_0[X_0['bedrooms'] < 8]
     Y_0 = pd.DataFrame(X_0['price'].copy(deep=True))
     kf = KFold(n_splits=k)
     X_0.drop('price', inplace=True, axis=1)
+
+    # Feature Engineering
+
     mean_r2_score = {}
     mean_rmse = {}
     r2_scores = {}
     rmse_scores = {}
     methods = ['dbscan', 'kmeans', 'none']
-    regressors = ['knn', 'lr', 'adaboost', 'gradientboosting', 'randomforest', 'decisiontree']
-    regressor_names = ['KNN', 'Linear Regression', 'AdaBoosting', 'Gradient Boosting', 'Random Forest', 'Decision Tree']
+    regressors = ['knn', 'lr', 'adaboost', 'gradientboosting', 'randomforest', 'decisiontree', 'xgboost']
+    regressor_names = ['KNN', 'LR', 'ADAB', 'GB', 'RF', 'DT', 'XGB']
     for k_iter, (train_inds, test_inds) in enumerate(kf.split(X_0)):
         print('Processing split %d' % (k_iter+1))
         X_train, X_test = X_0.iloc[train_inds].copy(), X_0.iloc[test_inds].copy()
@@ -118,12 +123,13 @@ if __name__ == '__main__':
         })
         scores = scores.explode('R2').explode('RMSE')
 
-        print ("Scores:\n", scores)
+        r2_plot = sns.boxplot(by='Model', column='R2')
+        r2_plot = r2_plot.get_figure()
+        r2_plot.savefig('./figures/'+method+'_R2_plot.png')
 
-        r2_plot = scores.boxplot(by='Model', column='R2', positions=[1, 7, 15, 21, 27, 35])
-        r2_plot.get_figure().savefig('./figures/'+method+'_R2_plot.png')
-        rmse_plot = scores.boxplot(by='Model', column='RMSE', positions=[1, 7, 15, 21, 27, 35])
-        rmse_plot.get_figure().savefig('./figures/'+method+'_RMSE_plot.png')
+        rmse_plot = sns.boxplot(by='Model', column='RMSE')
+        rmse_plot = rmse_plot.get_figure()
+        rmse_plot.savefig('./figures/'+method+'_RMSE_plot.png')
 
     '''
     pd.DataFrame({
