@@ -250,7 +250,7 @@ class cluster_model(object):
                         model[label]['xgboost'] = {}
                         model[label]['xgboost']['model'] = xgboost.XGBRegressor(n_estimators=900, learning_rate=0.05, max_depth=5)
                         model[label]['xgboost']['model'].fit(model[label]['X_train'], model[label]['Y_train']['price'])
-                        
+
                     elif regressor == 'pr2':
                         # Need to create and fit poly features in same function
                         model[label]['pr2']['model'] = LinearRegression(normalize=True)

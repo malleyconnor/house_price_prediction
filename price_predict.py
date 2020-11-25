@@ -69,7 +69,7 @@ if __name__ == '__main__':
         print('Initializing clustering model...')
 
         cm = cluster_model(X_0, Y_0, X_train, X_test, Y_train, Y_test, cluster_type='latlong',\
-        cluster_methods=methods, regressors=regressors, plot_clusters=True, doRF=True)
+        cluster_methods=methods, regressors=regressors, plot_clusters=True, doMRMR=True)
 
         if savePlots:
             plot_train_test_split(X_train['long'], X_test['long'], X_train['lat'], X_test['lat'], k=k_iter+1)
@@ -115,13 +115,11 @@ if __name__ == '__main__':
         })
         scores = scores.explode('R2').explode('RMSE')
 
-        r2_plot = sns.boxplot(by='Model', column='R2')
-        r2_plot = r2_plot.get_figure()
-        r2_plot.savefig('./figures/'+method+'_R2_plot.png')
+        r2_plot = sns.boxplot(x='Model', y='R2', data=scores)
+        r2_plot.get_figure().savefig('./figures/'+method+'_R2_plot.png')
 
-        rmse_plot = sns.boxplot(by='Model', column='RMSE')
-        rmse_plot = rmse_plot.get_figure()
-        rmse_plot.savefig('./figures/'+method+'_RMSE_plot.png')
+        rmse_plot = sns.boxplot(x='Model', y='RMSE', data=scores)
+        rmse_plot.get_figure().savefig('./figures/'+method+'_RMSE_plot.png')
 
     '''
     pd.DataFrame({
