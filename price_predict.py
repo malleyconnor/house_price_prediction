@@ -62,25 +62,17 @@ if __name__ == '__main__':
         X_train, X_test = X_0.iloc[train_inds].copy(), X_0.iloc[test_inds].copy()
         Y_train, Y_test = Y_0.iloc[train_inds].copy(), Y_0.iloc[test_inds].copy()
 
-        # Initializing data for clustering
-        #preprocessed_data = DataPreprocessor(drop_features=['date', 'id'], 
-        #save_dir='./data', test_size=test_size, normalize_labels=False, save_plots=True, plotDir=plotDir,
-        #omit_norm_features=['zipcode', 'lat', 'long'], xtrain=X_train, xtest=X_test,
-        #ytrain=Y_train, ytest=Y_test, input_split=True)
-
-        # Initial Preprocessing of data
-        #X, Y, X_train, X_test, Y_train, Y_test = preprocessed_data.X, preprocessed_data.Y,\
-        #preprocessed_data.X_train, preprocessed_data.X_test, preprocessed_data.Y_train, preprocessed_data.Y_test 
+        if k_iter == 0:
+            plot_pearson_matrix(X_train, Y_train, k=k_iter+1)
 
         # Creating one specific type of cluster model
         print('Initializing clustering model...')
 
         cm = cluster_model(X_0, Y_0, X_train, X_test, Y_train, Y_test, cluster_type='latlong',\
-        cluster_methods=methods, regressors=regressors, plot_clusters=True, doMRMR=True)
+        cluster_methods=methods, regressors=regressors, plot_clusters=True, doRF=True)
 
         if savePlots:
             plot_train_test_split(X_train['long'], X_test['long'], X_train['lat'], X_test['lat'], k=k_iter+1)
-            #plot_pearson_matrix(X_train[list(X_train.columns).remove('id')], Y_train, k=k_iter+1)
 
         cm.evaluate()
 
