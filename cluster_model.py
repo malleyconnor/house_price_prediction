@@ -6,15 +6,18 @@ from preprocess import *
 from sklearn.metrics import r2_score, mean_squared_error
 from scipy.spatial import distance
 from sklearn.cluster import KMeans, DBSCAN
+from sklearn.preprocessing import PolynomialFeatures
 from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor, GradientBoostingRegressor, BaggingRegressor
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, median_absolute_error
+import xgboost
 
 class cluster_model(object):
     def __init__(self, X, Y, X_train, X_test, Y_train, Y_test, cluster_type='latlong', 
-    cluster_methods=['dbscan', 'kmeans', 'none'], regressors=['knn'], plot_clusters=True, plotDir='./figures', doMRMR=False):
+    cluster_methods=['dbscan', 'kmeans', 'none'], regressors=['knn'], plot_clusters=True, 
+    plotDir='./figures', doMRMR=False, doRF=False):
         self.X = X.copy()
         self.Y = Y.copy()
         self.X_train = X_train.copy()
@@ -28,11 +31,13 @@ class cluster_model(object):
         self.plot_clusters = plot_clusters
         self.test_size = 0.2
         self.doMRMR = doMRMR
+        self.doRF = doRF
 
         if cluster_type == 'latlong':
             self.__latlong_cluster()
             
         self.models = self.__build_model()
+
 
     # Preprocesses clusters individually
     # Includes normalization and feature selection with mRMR
@@ -42,7 +47,7 @@ class cluster_model(object):
             clusters = self.__get_cluster_labels(method)
             for cluster in clusters:
                 preprocessed_data = DataPreprocessor(xtrain=self.models[method][cluster]['X_train'], xtest=self.models[method][cluster]['X_test'], 
-                ytrain=self.models[method][cluster]['Y_train'], ytest=self.models[method][cluster]['Y_test'], drop_features=['date', 'id'],
+                ytrain=self.models[method][cluster]['Y_train'], ytest=self.models[method][cluster]['Y_test'], drop_features=['date', 'id', 'zipcode'],
                 save_dir='./data/'+str(method)+'/'+str(cluster), test_size=self.test_size, normalize_labels=False, save_plots=False, 
                 plotDir=self.plotDir+'/'+str(method)+'/'+str(cluster), input_split=True, omit_norm_features=[])
 
@@ -52,20 +57,38 @@ class cluster_model(object):
                     if len(list(set(preprocessed_data.X_train[column]))) <= 1:
                         preprocessed_data.X_train.drop(column, axis=1, inplace=True)
                         preprocessed_data.X_test.drop(column, axis=1, inplace=True)
-            
 
-                k = 7
+                self.models[method][cluster]['preprocessed_data'] = preprocessed_data
+
+                k = 8
                 if (self.doMRMR):
-                    self.models[method][cluster]['preprocessed_data'] = preprocessed_data
-                    selected_features = self.models[method][cluster]['preprocessed_data'].mRMR(k=7, verbose=0)
+                    selected_features = self.models[method][cluster]['preprocessed_data'].mRMR(k=k, verbose=0)
+                elif (self.doRF):
+                    selected_features = self.models[method][cluster]['preprocessed_data'].rf_rank(threshold=0.01)
                 else:
                     selected_features = preprocessed_data.X_train.columns
 
 
-                self.models[method][cluster]['X_train'] = preprocessed_data.X_train[selected_features[:7]].copy()
-                self.models[method][cluster]['X_test']  = preprocessed_data.X_test[selected_features[:7]].copy()
+                self.models[method][cluster]['X_train'] = preprocessed_data.X_train[selected_features[:k]].copy()
+                self.models[method][cluster]['X_test']  = preprocessed_data.X_test[selected_features[:k]].copy()
                 self.models[method][cluster]['Y_train'] = preprocessed_data.Y_train.copy()
                 self.models[method][cluster]['Y_test']  = preprocessed_data.Y_test.copy()
+
+                # Create separate sets of features for poly regression
+                for regressor in self.regressors:
+                    if regressor == 'pr2':
+                        self.models[method][cluster]['pr2'] = {}
+                        self.models[method][cluster]['pr2']['poly_transform'] = PolynomialFeatures(degree=2)
+                        poly = self.models[method][cluster]['pr2']['poly_transform']
+                        self.models[method][cluster]['pr2']['X_train'] = poly.fit_transform(self.models[method][cluster]['X_train'].copy())
+                        self.models[method][cluster]['pr2']['X_test']  = poly.fit_transform(self.models[method][cluster]['X_test'].copy())
+                    elif regressor == 'pr3':
+                        self.models[method][cluster]['pr3'] = {}
+                        self.models[method][cluster]['pr3']['poly_transform'] = PolynomialFeatures(degree=3)
+                        poly = self.models[method][cluster]['pr3']['poly_transform']
+                        self.models[method][cluster]['pr3']['X_train'] = poly.fit_transform(self.models[method][cluster]['X_train'].copy())
+                        self.models[method][cluster]['pr3']['X_test']  = poly.fit_transform(self.models[method][cluster]['X_test'].copy())
+
 
 
     # Clustering based on lat long data
@@ -223,6 +246,21 @@ class cluster_model(object):
                         model[label]['decisiontree']['model'] = DecisionTreeRegressor()
                         model[label]['decisiontree']['model'].fit(model[label]['X_train'], model[label]['Y_train']['price'])
 
+                    elif regressor == 'xgboost':
+                        model[label]['xgboost'] = {}
+                        model[label]['xgboost']['model'] = xgboost.XGBRegressor(n_estimators=900, learning_rate=0.05, max_depth=5)
+                        model[label]['xgboost']['model'].fit(model[label]['X_train'], model[label]['Y_train']['price'])
+
+                    elif regressor == 'pr2':
+                        # Need to create and fit poly features in same function
+                        model[label]['pr2']['model'] = LinearRegression(normalize=True)
+                        model[label]['pr2']['model'].fit(model[label]['pr2']['X_train'], model[label]['Y_train']['price'])
+
+                    elif regressor == 'pr3':
+                        # Need to create and fit poly features in same function
+                        model[label]['pr3']['model'] = LinearRegression(normalize=True)
+                        model[label]['pr3']['model'].fit(model[label]['pr3']['X_train'], model[label]['Y_train']['price'])
+
 
 
     def __get_kmeans_train_and_test_sets(self, model):
@@ -280,6 +318,7 @@ class cluster_model(object):
         
         return clusters
 
+
     # Evaluates the model on X_test set
     def evaluate(self, verbose=1):
         predictions = {}
@@ -296,10 +335,17 @@ class cluster_model(object):
             for regressor in self.regressors:
                 predictions[regressor] = []
                 labels[regressor] = []
-                for cluster in clusters:
-                    predictions[regressor].extend(self.models[method][cluster][regressor]['model'].predict(
-                    self.models[method][cluster]['X_test']))
-                    labels[regressor].extend(self.models[method][cluster]['Y_test']['price'].to_list())
+
+                if regressor != 'pr2' and regressor != 'pr3':
+                    for cluster in clusters:
+                        predictions[regressor].extend(self.models[method][cluster][regressor]['model'].predict(
+                        self.models[method][cluster]['X_test']))
+                        labels[regressor].extend(self.models[method][cluster]['Y_test']['price'].to_list())
+                else:
+                    for cluster in clusters:
+                        predictions[regressor].extend(self.models[method][cluster][regressor]['model'].predict(
+                        self.models[method][cluster][regressor]['X_test']))
+                        labels[regressor].extend(self.models[method][cluster]['Y_test']['price'].to_list())
 
                 # Getting total prediction score of the whole model
                 score = r2_score(labels[regressor], predictions[regressor])
@@ -311,8 +357,6 @@ class cluster_model(object):
 
                 self.r2_score[method][regressor] = score
                 self.rmse[method][regressor]     = rmse
-
-
 
 
 

@@ -8,6 +8,7 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import PolynomialFeatures
 import scipy
 import statistics
+import seaborn as sns
 import sys, getopt
 import os
 
@@ -42,30 +43,27 @@ if __name__ == '__main__':
     # KFold Split and Evaluation
     k = 5
     X_0 = pd.read_csv('./data/kc_house_data.csv')
+    X_0 = X_0[X_0['bedrooms'] < 8]
     Y_0 = pd.DataFrame(X_0['price'].copy(deep=True))
     kf = KFold(n_splits=k)
     X_0.drop('price', inplace=True, axis=1)
+
+    # Feature Engineering
+
     mean_r2_score = {}
     mean_rmse = {}
     r2_scores = {}
     rmse_scores = {}
     methods = ['dbscan', 'kmeans', 'none']
-    regressors = ['knn', 'lr', 'adaboost', 'gradientboosting', 'randomforest', 'decisiontree']
-    regressor_names = ['KNN', 'Linear Regression', 'AdaBoosting', 'Gradient Boosting', 'Random Forest', 'Decision Tree']
+    regressors = ['knn', 'lr', 'adaboost', 'gradientboosting', 'randomforest', 'decisiontree', 'xgboost']
+    regressor_names = ['KNN', 'LR', 'ADAB', 'GB', 'RF', 'DT', 'XGB']
     for k_iter, (train_inds, test_inds) in enumerate(kf.split(X_0)):
         print('Processing split %d' % (k_iter+1))
         X_train, X_test = X_0.iloc[train_inds].copy(), X_0.iloc[test_inds].copy()
         Y_train, Y_test = Y_0.iloc[train_inds].copy(), Y_0.iloc[test_inds].copy()
 
-        # Initializing data for clustering
-        #preprocessed_data = DataPreprocessor(drop_features=['date', 'id'], 
-        #save_dir='./data', test_size=test_size, normalize_labels=False, save_plots=True, plotDir=plotDir,
-        #omit_norm_features=['zipcode', 'lat', 'long'], xtrain=X_train, xtest=X_test,
-        #ytrain=Y_train, ytest=Y_test, input_split=True)
-
-        # Initial Preprocessing of data
-        #X, Y, X_train, X_test, Y_train, Y_test = preprocessed_data.X, preprocessed_data.Y,\
-        #preprocessed_data.X_train, preprocessed_data.X_test, preprocessed_data.Y_train, preprocessed_data.Y_test 
+        if k_iter == 0:
+            plot_pearson_matrix(X_train, Y_train, k=k_iter+1)
 
         # Creating one specific type of cluster model
         print('Initializing clustering model...')
@@ -75,7 +73,6 @@ if __name__ == '__main__':
 
         if savePlots:
             plot_train_test_split(X_train['long'], X_test['long'], X_train['lat'], X_test['lat'], k=k_iter+1)
-            #plot_pearson_matrix(X_train[list(X_train.columns).remove('id')], Y_train, k=k_iter+1)
 
         cm.evaluate()
 
@@ -118,11 +115,10 @@ if __name__ == '__main__':
         })
         scores = scores.explode('R2').explode('RMSE')
 
-        print ("Scores:\n", scores)
-
-        r2_plot = scores.boxplot(by='Model', column='R2', positions=[1, 7, 15, 21, 27, 35])
+        r2_plot = sns.boxplot(x='Model', y='R2', data=scores)
         r2_plot.get_figure().savefig('./figures/'+method+'_R2_plot.png')
-        rmse_plot = scores.boxplot(by='Model', column='RMSE', positions=[1, 7, 15, 21, 27, 35])
+
+        rmse_plot = sns.boxplot(x='Model', y='RMSE', data=scores)
         rmse_plot.get_figure().savefig('./figures/'+method+'_RMSE_plot.png')
 
     '''
