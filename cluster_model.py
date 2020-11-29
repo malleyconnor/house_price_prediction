@@ -33,6 +33,10 @@ class cluster_model(object):
         self.doMRMR = doMRMR
         self.doRF = doRF
 
+        if doRF and doMRMR:
+            print('Set doMRMR=True or doRF=True, not both.')
+            exit()
+
         if cluster_type == 'latlong':
             self.__latlong_cluster()
             
@@ -115,7 +119,7 @@ class cluster_model(object):
             elif method == 'dbscan':
                 self.__find_best_dbscan()
 
-    def __find_best_dbscan(self, eps_vals=None, core_neighbors_vals=None, createPlots=True, precomputed=False, default_eps=0.0175):
+    def __find_best_dbscan(self, eps_vals=None, core_neighbors_vals=None, createPlots=True, precomputed=True, default_eps=0.0175, default_ms=100):
         print('Getting DBSCAN clustering')
         if not precomputed:
             max_k = 100
@@ -147,7 +151,7 @@ class cluster_model(object):
             
         # DBSCAN clustering
         # (Fixing min_samples = 50 here)
-        core_neighbors_vals = [75]
+        core_neighbors_vals = [default_ms]
         eps_vals = [default_eps]
         for eps in eps_vals:
             for core_neighors in core_neighbors_vals:

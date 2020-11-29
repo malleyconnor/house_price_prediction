@@ -193,6 +193,10 @@ class DataPreprocessor(object):
                 if importance[1] < threshold:
                     cutoff = i
             feature_importances = feature_importances[:cutoff]
+            feature_strs = []
+            for i in range(len(feature_importances)):
+                feature_strs.append(feature_importances[i][0])
+            return feature_strs
 
         if (disp):
             print('\nTop 10 Features reverse sorted by importance from random forest')
@@ -380,34 +384,3 @@ class DataPreprocessor(object):
 
         self.mrmr_mult_knn_best_features = best_features
         
-
-
-
-
-## Returns a label value to its unnormalized price
-#def unnormalize_val(y, min_val, max_val):
-#    return y * (max_val - min_val) + min_val
-# 
-#def unnormalize_arr(Y, min_val, max_val):
-#    for i in range(len(Y)):
-#       Y[i] = unnormalize_val(Y[i], min_val, max_val)
-#
-#   return Y
-
-
-## Training random forest regressors using restricted number of top features
-## TODO: Try exhaustive/randomized grid search with n_features, n_estimators, max_depth
-#num_features = 10
-#n_estimators = 100
-#feature_list = [feature[0] for feature in feature_importances[0:num_features]]
-#if 'zipcode' in feature_list:
-#    feature_list.remove('zipcode')
-#    num_features -= 1
-#
-## %20 Dropout for each tree
-#max_depth = (num_features * 8) // 10
-#rf = RandomForestRegressor(n_estimators=n_estimators, n_jobs=-1, max_depth=max_depth)
-#rf.fit(X_train[feature_list], Y_train['price'])
-#Y_pred = rf.predict(X_test[feature_list])
-#rf_error = mean_absolute_error(Y_test, Y_pred)
-#print('MAE of Random Forest: %f' % (rf_error))
