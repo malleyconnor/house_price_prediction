@@ -44,9 +44,15 @@ if __name__ == '__main__':
     k = 5
     X_0 = pd.read_csv('./data/kc_house_data.csv')
     X_0 = X_0[X_0['bedrooms'] < 8]
-    Y_0 = pd.DataFrame(X_0['price'].copy(deep=True))
+    Y_0 = pd.DataFrame(X_0['price'].copy(deep=True), columns=['price'])
     kf = KFold(n_splits=k)
-    X_0.drop('price', inplace=True, axis=1)
+
+    X_0.drop(['price', 'date', 'id', 'zipcode'], inplace=True, axis=1)
+
+
+    plot_price_heatmap(X_0['long'], X_0['lat'], Y_0['price'])
+    plot_feature_histograms(X_0, get_feature_stats(X_0), save_dir='./figures/none/0')
+    plot_feature_histograms(Y_0, get_feature_stats(Y_0), save_dir='./figures/none/0')
 
     # Feature Engineering
 
@@ -69,7 +75,7 @@ if __name__ == '__main__':
         print('Initializing clustering model...')
 
         cm = cluster_model(X_0, Y_0, X_train, X_test, Y_train, Y_test, cluster_type='latlong',\
-        cluster_methods=methods, regressors=regressors, plot_clusters=True, doMRMR=True)
+        cluster_methods=methods, regressors=regressors, plot_clusters=True, doRF=True)
 
         if savePlots:
             plot_train_test_split(X_train['long'], X_test['long'], X_train['lat'], X_test['lat'], k=k_iter+1)

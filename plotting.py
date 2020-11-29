@@ -25,7 +25,8 @@ featureTypes = {
     'lat'           : 'continuous',
     'long'          : 'continuous',
     'sqft_living15' : 'continuous',
-    'sqft_lot15'    : 'continuous'
+    'sqft_lot15'    : 'continuous',
+    'price'         : 'continuous'
 }
 
 typeEnum = {
@@ -37,6 +38,7 @@ typeEnum = {
 
 # Plots histograms of all features in input dataframe
 def plot_feature_histograms(X, feature_stats=None, save_dir='./figures'):
+    os.makedirs(save_dir, exist_ok=True)
     for column in X.columns:
         plt.hist(x=X[column], bins='auto', density=True, rwidth=0.95)
         plt.title('%s Probablity Density (%s)' % (column, featureTypes[column]))
@@ -46,7 +48,7 @@ def plot_feature_histograms(X, feature_stats=None, save_dir='./figures'):
         if (feature_stats):
             statStrings = []
             for stat in feature_stats[column].keys():
-                statStrings.append('%s = %f\n' % (stat, feature_stats[column][stat]))
+                statStrings.append('%s = %.3f\n' % (stat, feature_stats[column][stat]))
 
             statString = ''.join(statStrings)
 
@@ -57,6 +59,7 @@ def plot_feature_histograms(X, feature_stats=None, save_dir='./figures'):
 
         plt.savefig('%s/%s_hist.png' % (save_dir, column), dpi=300)
         plt.clf()
+
 
 
 # Plots feature correlation with the label
@@ -198,37 +201,29 @@ def plot_pearson_matrix(X_train, Y_train, label='price', save_dir='./figures/cor
 
 
 
-#def plot_price_heatmap(long, lat, prices,
-#save_dir='./figures', background_dir='./map.png', marker_size=0.03, k=-1):
-#    # Transform lat and long with map offset
-#    mc = [47.0451, -122.5736, 47.8116, -120.9609]
-#    long_tr = long_train.apply(lambda x: (x - mc[1]) / (mc[3] - mc[1]))
-#    long_te  = long_test.apply(lambda x: (x - mc[1]) / (mc[3] - mc[1]))
-#    lat_tr  = lat_train.apply(lambda x: (x - mc[0]) / (mc[2] - mc[0]))
-#    lat_te   = lat_test.apply(lambda x: (x - mc[0]) / (mc[2] - mc[0]))
-#
-#    # Gets color map for clusters from colormap (to allow any # of clusters)
-#    cmap = plt.cm.ScalarMappable(norm=matplotlib.colors.Normalize(
-#        vmin=np.min(prices), vmax=np.max(prices)), cmap='bwr')
-#
-#    # Create and save plot
-#    bg = plt.imread(background_dir)
-#    fig, ax = plt.subplots()
-#    ax.imshow(bg, extent=[0, 1, 0, 1])
-#    ax.scatter(long_te, lat_te, color=cmap.to_rgba(1), s=marker_size, label='Test')
-#    ax.scatter(long_tr, lat_tr, color=cmap.to_rgba(0), s=marker_size, label='Train')
-#    ax.axis('off')
-#
-#    # Creating Legend
-#    legend_elements = [Line2D([0], [0], color=cmap.to_rgba(0), marker='o', markersize=8, label='Train'),
-#        Line2D([0], [0], color=cmap.to_rgba(1), marker='o', markersize=8, label='Test')]
-#    plt.legend(handles=legend_elements)
-#    
-#    if k == -1:
-#        plt.savefig('%s/train_test_split.png' % (save_dir), dpi=300)
-#    else:
-#        plt.savefig('%s/train_test_split_%d.png' % (save_dir, k), dpi=300)
-#
-#    plt.clf()
-#    fig.clf()
-#    plt.close('all')
+def plot_price_heatmap(long, lat, prices,
+save_dir='./figures', background_dir='./map.png', marker_size=0.03, k=-1):
+    # Transform lat and long with map offset
+    mc = [47.0451, -122.5736, 47.8116, -120.9609]
+    long_temp = long.apply(lambda x: (x - mc[1]) / (mc[3] - mc[1]))
+    lat_temp  = lat.apply(lambda x: (x - mc[0]) / (mc[2] - mc[0]))
+
+    # Gets color map for clusters from colormap (to allow any # of clusters)
+    cmap = plt.cm.ScalarMappable(norm=matplotlib.colors.Normalize(
+        vmin=np.min(prices), vmax=np.max(prices)), cmap='bwr')
+
+    # Create and save plot
+    bg = plt.imread(background_dir)
+    fig, ax = plt.subplots()
+    ax.imshow(bg, extent=[0, 1, 0, 1])
+    ax.scatter(long_temp, lat_temp, color=cmap.to_rgba(prices), s=marker_size, label='Test')
+    ax.axis('off')
+
+    if k == -1:
+        plt.savefig('%s/price_heatmap.png' % (save_dir), dpi=300)
+    else:
+        plt.savefig('%s/price_heatmap_%d.png' % (save_dir, k), dpi=300)
+
+    plt.clf()
+    fig.clf()
+    plt.close('all')

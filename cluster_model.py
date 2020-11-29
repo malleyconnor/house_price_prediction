@@ -51,7 +51,7 @@ class cluster_model(object):
             clusters = self.__get_cluster_labels(method)
             for cluster in clusters:
                 preprocessed_data = DataPreprocessor(xtrain=self.models[method][cluster]['X_train'], xtest=self.models[method][cluster]['X_test'], 
-                ytrain=self.models[method][cluster]['Y_train'], ytest=self.models[method][cluster]['Y_test'], drop_features=['date', 'id', 'zipcode'],
+                ytrain=self.models[method][cluster]['Y_train'], ytest=self.models[method][cluster]['Y_test'], drop_features=[],
                 save_dir='./data/'+str(method)+'/'+str(cluster), test_size=self.test_size, normalize_labels=False, save_plots=False, 
                 plotDir=self.plotDir+'/'+str(method)+'/'+str(cluster), input_split=True, omit_norm_features=[])
 
