@@ -366,7 +366,7 @@ class cluster_model(object):
                         predictions[regressor].extend(these_predictions)
                         labels[regressor].extend(these_labels.to_list())
                         plot_predictions(these_predictions, these_labels, 
-                            r2_score(these_labels, these_predictions), mean_squared_error(these_labels, these_predictions), 
+                            r2_score(these_labels, these_predictions), mean_squared_error(these_labels, these_predictions, squared=False), 
                             save_dir=self.plotDir+'/'+method+'/'+str(cluster)+'/'+regressor)
                 else:
                     for cluster in clusters:
@@ -377,7 +377,7 @@ class cluster_model(object):
                         predictions[regressor].extend(these_predictions)
                         labels[regressor].extend(these_labels.to_list())
                         plot_predictions(these_predictions, these_labels, 
-                            r2_score(these_labels, these_predictions), mean_squared_error(these_labels, these_predictions), 
+                            r2_score(these_labels, these_predictions), mean_squared_error(these_labels, these_predictions, squared=False), 
                             save_dir=self.plotDir+'/'+method+'/'+str(cluster)+'/'+regressor)
                 
                 self.predictions[method][regressor] = predictions[regressor]
