@@ -210,13 +210,15 @@ save_dir='./figures', background_dir='./map.png', marker_size=0.03, k=-1):
 
     # Gets color map for clusters from colormap (to allow any # of clusters)
     cmap = plt.cm.ScalarMappable(norm=matplotlib.colors.Normalize(
-        vmin=np.min(prices), vmax=np.max(prices)), cmap='bwr')
+        vmin=np.min(prices), vmax=np.max(prices)), cmap='summer')
 
     # Create and save plot
     bg = plt.imread(background_dir)
     fig, ax = plt.subplots()
     ax.imshow(bg, extent=[0, 1, 0, 1])
     ax.scatter(long_temp, lat_temp, color=cmap.to_rgba(prices), s=marker_size, label='Test')
+    cbar = fig.colorbar(cmap)
+    cbar.set_label('Price (USD)')
     ax.axis('off')
 
     if k == -1:
@@ -226,4 +228,29 @@ save_dir='./figures', background_dir='./map.png', marker_size=0.03, k=-1):
 
     plt.clf()
     fig.clf()
+    plt.close('all')
+
+
+def plot_predictions(predictions, labels, R2, RMSE, save_dir='./figures'):
+    os.makedirs(save_dir, exist_ok=True)
+    plt.scatter(labels, predictions)
+    min_price = np.min([np.min(predictions), np.min(labels)])
+    max_price = np.max([np.max(predictions), np.max(labels)])
+    plt.xlim([min_price, max_price])
+    plt.ylim([min_price, max_price])
+    plt.xlabel('Labels')
+    plt.ylabel('Predictions')
+    plt.title('Price Predictions vs. Truth Labels')
+
+
+    # Displaying scores
+    eval_str = "R^2 = %.3f\nRMSE = %.3f" % (R2, RMSE) 
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5) #From Stackoverflow
+    plt.text(0.95, 0.95, eval_str, transform=plt.gca().transAxes, fontsize=10, 
+    verticalalignment='top', horizontalalignment='right', bbox=props)
+
+
+
+    plt.savefig(save_dir+'/predictions_v_labels.png', dpi=300)
+    plt.clf()
     plt.close('all')

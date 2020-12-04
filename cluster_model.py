@@ -37,6 +37,28 @@ class cluster_model(object):
             print('Set doMRMR=True or doRF=True, not both.')
             exit()
 
+
+        # Feature selection
+        if doMRMR:
+            #self.dp = DataPreprocessor(input_split=True, xtrain=self.X_train, xtest=self.X_test, ytrain=self.Y_train, ytest=self.Y_test,
+            #    omit_norm_features=[], drop_features=[], save_dir='./data/none')
+            #self.dp.mRMR_KNN_test()
+            #self.selected_features = self.dp.mrmr_add_knn_best_features
+
+            # Using best 8 features, as that is when the mrmr_knn_test score hardly increases
+            self.selected_features = ['sqft_living', 'lat', 'grade', 'yr_renovated', 'waterfront', 'condition', 'sqft_living15', 'sqft_lot']#, 
+            print("Selected features: %s" % (str(self.selected_features))) 
+            #'sqft_above', 'sqft_basement', 'view', 'bathrooms', 'sqft_lot15', 'bedrooms', 'floors', 'long']
+        elif doRF:
+            self.dp = DataPreprocessor(input_split=True, xtrain=self.X_train, xtest=self.X_test, ytrain=self.Y_train, ytest=self.Y_test,
+                omit_norm_features=[], drop_features=[], save_dir='./data/none')
+            self.selected_features = self.dp.rf_rank(n_estimators=100, threshold=0.01)
+            print("Selected features: %s" % (str(self.selected_features))) 
+        else:
+            self.selected_Features = self.X_train.columns
+
+
+
         if cluster_type == 'latlong':
             self.__latlong_cluster()
             
@@ -54,29 +76,21 @@ class cluster_model(object):
                 ytrain=self.models[method][cluster]['Y_train'], ytest=self.models[method][cluster]['Y_test'], drop_features=[],
                 save_dir='./data/'+str(method)+'/'+str(cluster), test_size=self.test_size, normalize_labels=False, save_plots=False, 
                 plotDir=self.plotDir+'/'+str(method)+'/'+str(cluster), input_split=True, omit_norm_features=[])
-
-                # In case a feature has the same value for every data point in a cluster 
-                columns = preprocessed_data.X_train.columns
-                for column in columns:
-                    if len(list(set(preprocessed_data.X_train[column]))) <= 1:
-                        preprocessed_data.X_train.drop(column, axis=1, inplace=True)
-                        preprocessed_data.X_test.drop(column, axis=1, inplace=True)
-
                 self.models[method][cluster]['preprocessed_data'] = preprocessed_data
 
-                k = 8
-                if (self.doMRMR):
-                    selected_features = self.models[method][cluster]['preprocessed_data'].mRMR(k=k, verbose=0)
-                elif (self.doRF):
-                    selected_features = self.models[method][cluster]['preprocessed_data'].rf_rank(threshold=0.01)
-                else:
-                    selected_features = preprocessed_data.X_train.columns
 
-
-                self.models[method][cluster]['X_train'] = preprocessed_data.X_train[selected_features[:k]].copy()
-                self.models[method][cluster]['X_test']  = preprocessed_data.X_test[selected_features[:k]].copy()
+                self.models[method][cluster]['X_train'] = preprocessed_data.X_train[self.selected_features].copy()
+                self.models[method][cluster]['X_test']  = preprocessed_data.X_test[self.selected_features].copy()
                 self.models[method][cluster]['Y_train'] = preprocessed_data.Y_train.copy()
                 self.models[method][cluster]['Y_test']  = preprocessed_data.Y_test.copy()
+
+                # In case a feature has the same value for every data point in a cluster 
+                columns = self.models[method][cluster]['X_train'].columns
+                for column in columns:
+                    if len(list(set(preprocessed_data.X_train[column]))) <= 1:
+                        self.models[method][cluster]['X_train'].drop(column, axis=1, inplace=True)
+                        self.models[method][cluster]['X_test'].drop(column, axis=1, inplace=True)
+
 
                 # Create separate sets of features for poly regression
                 for regressor in self.regressors:
@@ -142,7 +156,7 @@ class cluster_model(object):
 
         
             if createPlots:
-                save_dir = self.plotDir + '/DBSCAN/eps_neighbor_search/'
+                save_dir = self.plotDir + '/dbscan/eps_neighbor_search/'
                 os.makedirs(save_dir, exist_ok=True)
                 
                 def_eps = np.full(max_k, fill_value=default_eps)
@@ -158,12 +172,11 @@ class cluster_model(object):
                     self.dbscan = DBSCAN(eps=eps, min_samples=core_neighors).fit(self.cluster_features)
                     if (self.plot_clusters):
                         plot_latlong_clusters(self.X_train['long'], self.X_train['lat'], self.dbscan.labels_, 
-                        save_dir=self.plotDir+"/DBSCAN", save_name=("latlong_DBSCAN_%s_%s" % (eps, core_neighors)))
+                        save_dir=self.plotDir+"/dbscan", save_name=("latlong_DBSCAN_%s_%s" % (eps, core_neighors)))
 
         print('%d different clusters' % len(list(set(self.dbscan.labels_))))
         return self.dbscan
 
-    # TODO: Change to actually return the best model
     def __find_best_kmeans(self, krange=None, precomputed=True, default_k=7):
         print('Finding best kmeans clustering...')
         if not precomputed:
@@ -330,30 +343,50 @@ class cluster_model(object):
         self.r2_score = {}
         self.rmse = {}
 
+        self.predictions = {}
+        self.labels = {}
         # Getting prediction scores for each regressor in each cluster
         for method in self.cluster_methods:
             clusters = self.__get_cluster_labels(method)
 
             self.r2_score[method] = {}
             self.rmse[method] = {}
+            self.predictions[method] = {}
+            self.labels[method] = {}
             for regressor in self.regressors:
                 predictions[regressor] = []
                 labels[regressor] = []
 
                 if regressor != 'pr2' and regressor != 'pr3':
                     for cluster in clusters:
-                        predictions[regressor].extend(self.models[method][cluster][regressor]['model'].predict(
-                        self.models[method][cluster]['X_test']))
-                        labels[regressor].extend(self.models[method][cluster]['Y_test']['price'].to_list())
+                        these_predictions = self.models[method][cluster][regressor]['model'].predict(
+                            self.models[method][cluster]['X_test']
+                        )
+                        these_labels = self.models[method][cluster]['Y_test']['price']
+                        predictions[regressor].extend(these_predictions)
+                        labels[regressor].extend(these_labels.to_list())
+                        plot_predictions(these_predictions, these_labels, 
+                            r2_score(these_labels, these_predictions), mean_squared_error(these_labels, these_predictions), 
+                            save_dir=self.plotDir+'/'+method+'/'+str(cluster)+'/'+regressor)
                 else:
                     for cluster in clusters:
-                        predictions[regressor].extend(self.models[method][cluster][regressor]['model'].predict(
-                        self.models[method][cluster][regressor]['X_test']))
-                        labels[regressor].extend(self.models[method][cluster]['Y_test']['price'].to_list())
+                        these_predictions = self.models[method][cluster][regressor]['model'].predict(
+                            self.models[method][cluster][regressor]['X_test']
+                        )
+                        these_labels = self.models[method][cluster]['Y_test']['price']
+                        predictions[regressor].extend(these_predictions)
+                        labels[regressor].extend(these_labels.to_list())
+                        plot_predictions(these_predictions, these_labels, 
+                            r2_score(these_labels, these_predictions), mean_squared_error(these_labels, these_predictions), 
+                            save_dir=self.plotDir+'/'+method+'/'+str(cluster)+'/'+regressor)
+                
+                self.predictions[method][regressor] = predictions[regressor]
+                self.labels[method][regressor] = labels[regressor]
+                
 
                 # Getting total prediction score of the whole model
                 score = r2_score(labels[regressor], predictions[regressor])
-                rmse  = mean_squared_error(labels[regressor], predictions[regressor], squared=False) 
+                rmse  = mean_squared_error(labels[regressor], predictions[regressor], squared=False)
 
                 if verbose:
                     print('R^2 score for %s clustering with %s regressor: %.4f' % (method, regressor, score))

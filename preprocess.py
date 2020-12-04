@@ -42,7 +42,6 @@ class DataPreprocessor(object):
             self.Y_train = ytrain.copy()
             self.Y_test  = ytest.copy()
 
-        #self.rf_rank()
         self.__preprocess_data()
 
         if (save_plots):
@@ -57,10 +56,10 @@ class DataPreprocessor(object):
             os.makedirs(plotDir+'/histograms', exist_ok=True)
             os.makedirs(plotDir+'/correlation', exist_ok=True)
             
-
-            plot_feature_histograms(self.X, save_dir=plotDir+'/histograms')
-            plot_feature_correlation(self.X, self.Y, save_dir=plotDir+"/correlation")
-            #plot_lat_long_hist(X)
+            plot_feature_histograms(self.X_train, save_dir=plotDir+'/histograms')
+            plot_feature_histograms(self.Y_train, save_dir=plotDir+'/histograms')
+            plot_feature_correlation(self.X_train, self.Y_train, save_dir=plotDir+"/correlation")
+            plot_price_heatmap(self.X_train['long'], self.X_train['lat'], self.Y_train['price'], save_dir=plotDir)
 
 
     # Normalizes data columns between 0 and 1
@@ -192,6 +191,7 @@ class DataPreprocessor(object):
             for i, importance in enumerate(feature_importances):
                 if importance[1] < threshold:
                     cutoff = i
+                    break
             feature_importances = feature_importances[:cutoff]
             feature_strs = []
             for i in range(len(feature_importances)):
@@ -354,7 +354,7 @@ class DataPreprocessor(object):
             features = feature_order[:k]
             KNN = KNeighborsRegressor(n_neighbors=5, weights='distance')
             KNN.fit(self.X_train[features], self.Y_train[self.label])
-            score = KNN.score(self.X_test[features], self.Y_test[self.label])
+            score = KNN.score(self.X_train[features], self.Y_train[self.label])
             print("KNN using", k, "mRMR selected features. Score = ", score)
 
             if score > best:
@@ -373,7 +373,7 @@ class DataPreprocessor(object):
             features = feature_order[:k]
             KNN = KNeighborsRegressor(n_neighbors=5, weights='distance')
             KNN.fit(self.X_train[features], self.Y_train)
-            score = KNN.score(self.X_test[features], self.Y_test[self.label])
+            score = KNN.score(self.X_train[features], self.Y_train[self.label])
             print("KNN using", k, "mRMR selected features. Score = ", score)
 
             if score > best:
@@ -383,4 +383,24 @@ class DataPreprocessor(object):
         print ("\b Best number of features for multiplicative mRMR and KNN is ", len(best_features), " with score of", best, " and using features:\n", best_features)
 
         self.mrmr_mult_knn_best_features = best_features
-        
+
+
+
+
+# Gets stats for each feature like mean, stddev, etc...
+def get_feature_stats(X):
+    stats = {}
+    for column in X.columns:
+        stats[column] = {}
+        stats[column]['mean'] = np.mean(X[column])
+        stats[column]['median'] = np.median(X[column])
+        stats[column]['std']  = np.std(X[column])
+        stats[column]['var']  = np.var(X[column])
+
+        # Gets mode (or None in case of continuous / equally probable values)
+        try:
+            stats[column]['mode'] = statistics.mode(X[column])
+        except statistics.StatisticsError:
+            mode = -1
+
+    return stats

@@ -26,7 +26,6 @@ def handle_cl_args():
     opts, args = getopt.getopt(sys.argv[1:], 'hp', ['help', 'plot='])
     for opt, arg in opts:
         if opt in ('-h', '--help'):
-            print('Figure it out dummy.')
             sys.exit(2)
         elif opt in ('-p', 'plot'):
             if (arg):
@@ -41,9 +40,8 @@ if __name__ == '__main__':
 
 
     # KFold Split and Evaluation
-    k = 2
+    k = 5
     X_0 = pd.read_csv('./data/kc_house_data.csv')
-    X_0 = X_0[X_0['bedrooms'] < 8]
     Y_0 = pd.DataFrame(X_0['price'].copy(deep=True), columns=['price'])
     kf = KFold(n_splits=k)
 
@@ -61,9 +59,11 @@ if __name__ == '__main__':
     mean_rmse = {}
     r2_scores = {}
     rmse_scores = {}
+    fsmode = 'rf'
     methods = ['dbscan', 'kmeans', 'none']
-    regressors = ['knn', 'lr']#, 'adaboost', 'gradientboosting', 'randomforest', 'decisiontree', 'xgboost']
-    regressor_names = ['KNN', 'LR']#, 'ADAB', 'GB', 'RF', 'DT', 'XGB']
+    regressors = ['knn', 'lr', 'adaboost', 'gradientboosting', 'randomforest', 'decisiontree', 'xgboost']
+    regressor_names = ['KNN', 'LR', 'ADAB', 'GB', 'RF', 'DT', 'XGB']
+    csv_names = ['KNN', 'Multiple Regression', 'Adaboost', 'Gradient Boosting', 'Random Forest', 'Decision Tree', 'XGBoost']
     for k_iter, (train_inds, test_inds) in enumerate(kf.split(X_0)):
         print('Processing split %d' % (k_iter+1))
         X_train, X_test = X_0.iloc[train_inds].copy(), X_0.iloc[test_inds].copy()
@@ -75,8 +75,16 @@ if __name__ == '__main__':
         # Creating one specific type of cluster model
         print('Initializing clustering model...')
 
-        cm = cluster_model(X_0, Y_0, X_train, X_test, Y_train, Y_test, cluster_type='latlong',\
-        cluster_methods=methods, regressors=regressors, plot_clusters=False, doRF=True)
+        if fsmode == 'mrmr':
+            cm = cluster_model(X_0, Y_0, X_train, X_test, Y_train, Y_test, cluster_type='latlong',\
+            cluster_methods=methods, regressors=regressors, plot_clusters=False, doMRMR=True)
+        elif fsmode == 'rf':
+            cm = cluster_model(X_0, Y_0, X_train, X_test, Y_train, Y_test, cluster_type='latlong',\
+            cluster_methods=methods, regressors=regressors, plot_clusters=False, doRF=True)
+        else:
+            cm = cluster_model(X_0, Y_0, X_train, X_test, Y_train, Y_test, cluster_type='latlong',\
+            cluster_methods=methods, regressors=regressors, plot_clusters=False)
+
 
         if savePlots:
             plot_train_test_split(X_train['long'], X_test['long'], X_train['lat'], X_test['lat'], k=k_iter+1)
@@ -100,6 +108,10 @@ if __name__ == '__main__':
                 mean_rmse[method][regressor] += cm.rmse[method][regressor]
                 r2_scores[method][regressor].append(cm.r2_score[method][regressor])
                 rmse_scores[method][regressor].append(cm.rmse[method][regressor])
+
+                plot_predictions(cm.predictions[method][regressor], cm.labels[method][regressor], 
+                cm.r2_score[method][regressor], cm.rmse[method][regressor], save_dir='./figures/'+method+'/'+regressor+'/'+str(k_iter+1))
+
 
 
     # Calculation of average evaluation scores
@@ -125,13 +137,13 @@ if __name__ == '__main__':
 
     # Writing results to CSV
     for method in methods:
-        scores_out = pd.DataFrame(index=regressors, columns=['Regressor', 'R^2', 'RMSE (USD)'])
-        scores_out['Regressor']   = regressors
-        for regressor in regressors:
-            scores_out['R^2'][regressor] = mean_r2_score[method][regressor]
-            scores_out['RMSE (USD)'][regressor] = mean_rmse[method][regressor]
+        scores_out = pd.DataFrame(index=csv_names, columns=['R^2', 'RMSE (USD)'])
+        #scores_out['Regressor']   = csv_names
+        for i, regressor in enumerate(regressors):
+            scores_out['R^2'][csv_names[i]] = mean_r2_score[method][regressor]
+            scores_out['RMSE (USD)'][csv_names[i]] = mean_rmse[method][regressor]
 
-        scores_out.to_csv('./data/%s_results.csv' % (method))
+        scores_out.to_csv('./data/%s_%s_results.csv' % (method, fsmode), float_format='%.3f')
 
 
 
