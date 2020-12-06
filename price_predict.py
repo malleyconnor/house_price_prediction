@@ -45,6 +45,8 @@ if __name__ == '__main__':
     Y_0 = pd.DataFrame(X_0['price'].copy(deep=True), columns=['price'])
     kf = KFold(n_splits=k)
 
+
+    # Dropping irrelevant / categorical features
     X_0.drop(['price', 'date', 'id', 'zipcode'], inplace=True, axis=1)
 
 
@@ -59,10 +61,10 @@ if __name__ == '__main__':
     mean_rmse = {}
     r2_scores = {}
     rmse_scores = {}
-    fsmode = 'rf'
+    fsmode = 'mrmr'
     methods = ['dbscan', 'kmeans', 'none']
-    regressors = ['knn', 'lr', 'adaboost', 'gradientboosting', 'randomforest', 'decisiontree', 'xgboost']
-    regressor_names = ['KNN', 'LR', 'ADAB', 'GB', 'RF', 'DT', 'XGB']
+    regressors = ['knn', 'lr', 'pr2', 'adaboost', 'gradientboosting', 'randomforest', 'decisiontree', 'xgboost']
+    regressor_names = ['KNN', 'LR', 'PR2', 'ADAB', 'GB', 'RF', 'DT', 'XGB']
     csv_names = ['KNN', 'Multiple Regression', 'Adaboost', 'Gradient Boosting', 'Random Forest', 'Decision Tree', 'XGBoost']
     for k_iter, (train_inds, test_inds) in enumerate(kf.split(X_0)):
         print('Processing split %d' % (k_iter+1))
@@ -137,13 +139,13 @@ if __name__ == '__main__':
 
     # Writing results to CSV
     for method in methods:
-        scores_out = pd.DataFrame(index=csv_names, columns=['R^2', 'RMSE (USD)'])
-        #scores_out['Regressor']   = csv_names
+        scores_out = pd.DataFrame(columns=['Regressor', 'R^2', 'RMSE (USD)'])
+        scores_out['Regressor']   = csv_names
         for i, regressor in enumerate(regressors):
-            scores_out['R^2'][csv_names[i]] = mean_r2_score[method][regressor]
-            scores_out['RMSE (USD)'][csv_names[i]] = mean_rmse[method][regressor]
+            scores_out['R^2'][i] = mean_r2_score[method][regressor]
+            scores_out['RMSE (USD)'][i] = mean_rmse[method][regressor]
 
-        scores_out.to_csv('./data/%s_%s_results.csv' % (method, fsmode), float_format='%.3f')
+        scores_out.to_csv('./data/%s_%s_results.csv' % (method, fsmode), float_format='%.4f')
 
 
 

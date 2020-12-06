@@ -6,7 +6,7 @@ from preprocess import *
 from sklearn.metrics import r2_score, mean_squared_error
 from scipy.spatial import distance
 from sklearn.cluster import KMeans, DBSCAN
-from sklearn.preprocessing import PolynomialFeatures
+from sklearn.preprocessing import PolynomialFeatures, StandardScaler
 from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor, GradientBoostingRegressor, BaggingRegressor
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
@@ -43,10 +43,10 @@ class cluster_model(object):
             #self.dp = DataPreprocessor(input_split=True, xtrain=self.X_train, xtest=self.X_test, ytrain=self.Y_train, ytest=self.Y_test,
             #    omit_norm_features=[], drop_features=[], save_dir='./data/none')
             #self.dp.mRMR_KNN_test()
-            #self.selected_features = self.dp.mrmr_add_knn_best_features
+            #self.selected_features = self.dp.mrmr_mult_knn_best_features
 
-            # Using best 8 features, as that is when the mrmr_knn_test score hardly increases
-            self.selected_features = ['sqft_living', 'lat', 'grade', 'yr_renovated', 'waterfront', 'condition', 'sqft_living15', 'sqft_lot']#, 
+            # Using best 8 features, as that is when the mrmr_knn_test score hardly increases (< 0.00001)
+            self.selected_features = ['sqft_living', 'grade', 'lat', 'waterfront', 'yr_renovated', 'sqft_above', 'sqft_living15', 'condition']
             print("Selected features: %s" % (str(self.selected_features))) 
             #'sqft_above', 'sqft_basement', 'view', 'bathrooms', 'sqft_lot15', 'bedrooms', 'floors', 'long']
         elif doRF:
@@ -56,8 +56,6 @@ class cluster_model(object):
             print("Selected features: %s" % (str(self.selected_features))) 
         else:
             self.selected_Features = self.X_train.columns
-
-
 
         if cluster_type == 'latlong':
             self.__latlong_cluster()
@@ -92,20 +90,26 @@ class cluster_model(object):
                         self.models[method][cluster]['X_test'].drop(column, axis=1, inplace=True)
 
 
+                
+
+
                 # Create separate sets of features for poly regression
                 for regressor in self.regressors:
                     if regressor == 'pr2':
                         self.models[method][cluster]['pr2'] = {}
-                        self.models[method][cluster]['pr2']['poly_transform'] = PolynomialFeatures(degree=2)
+                        self.models[method][cluster]['pr2']['poly_transform'] = PolynomialFeatures(degree=2, interaction_only=False, include_bias=False)
                         poly = self.models[method][cluster]['pr2']['poly_transform']
-                        self.models[method][cluster]['pr2']['X_train'] = poly.fit_transform(self.models[method][cluster]['X_train'].copy())
-                        self.models[method][cluster]['pr2']['X_test']  = poly.fit_transform(self.models[method][cluster]['X_test'].copy())
+                        ss = StandardScaler(with_std=True)
+                        self.models[method][cluster]['pr2']['X_train'] = ss.fit_transform(poly.fit_transform(self.models[method][cluster]['X_train'].copy()))#[self.models[method][cluster]['X_train'].columns[0:3]].copy()))
+                        self.models[method][cluster]['pr2']['X_test'] = ss.fit_transform(poly.transform(self.models[method][cluster]['X_test'].copy()))#[self.models[method][cluster]['X_train'].columns[0:3]].copy()))
                     elif regressor == 'pr3':
                         self.models[method][cluster]['pr3'] = {}
-                        self.models[method][cluster]['pr3']['poly_transform'] = PolynomialFeatures(degree=3)
+                        self.models[method][cluster]['pr3']['poly_transform'] = PolynomialFeatures(degree=3, interaction_only=False, include_bias=False)
                         poly = self.models[method][cluster]['pr3']['poly_transform']
-                        self.models[method][cluster]['pr3']['X_train'] = poly.fit_transform(self.models[method][cluster]['X_train'].copy())
-                        self.models[method][cluster]['pr3']['X_test']  = poly.fit_transform(self.models[method][cluster]['X_test'].copy())
+                        ss = StandardScaler(with_std=True)
+                        self.models[method][cluster]['pr3']['X_train'] = ss.fit_transform(poly.fit_transform(self.models[method][cluster]['X_train'].copy()))#[self.models[method][cluster]['X_train'].columns[0:3]].copy()))
+                        self.models[method][cluster]['pr3']['X_test'] = ss.fit_transform(poly.transform(self.models[method][cluster]['X_test'].copy()))#[self.models[method][cluster]['X_train'].columns[0:3]].copy()))
+
 
 
 
@@ -387,6 +391,7 @@ class cluster_model(object):
                 # Getting total prediction score of the whole model
                 score = r2_score(labels[regressor], predictions[regressor])
                 rmse  = mean_squared_error(labels[regressor], predictions[regressor], squared=False)
+
 
                 if verbose:
                     print('R^2 score for %s clustering with %s regressor: %.4f' % (method, regressor, score))
